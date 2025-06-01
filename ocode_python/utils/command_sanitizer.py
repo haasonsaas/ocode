@@ -2,7 +2,6 @@
 Command sanitization utilities for shell execution safety.
 """
 
-import platform
 import re
 import shlex
 from typing import Dict, List, Optional, Tuple
@@ -13,6 +12,7 @@ class CommandSanitizer:
 
     def __init__(self):
         """Initialize sanitizer with dangerous patterns."""
+        import platform
 
         # Patterns that should never be allowed - Unix patterns
         unix_patterns = [
@@ -49,9 +49,9 @@ class CommandSanitizer:
         windows_patterns = [
             # System destruction
             r"\bformat\s+[cC]:",
-            r"\bdel\s+/[sS]\s+[cC]:[/\\]",
-            r"\brd\s+/[sS]\s+[cC]:[/\\]",
-            r"\brmdir\s+/[sS]\s+[cC]:[/\\]",
+            r"\bdel\s+/[sS]\s+[cC]:\\\\",
+            r"\brd\s+/[sS]\s+[cC]:\\\\",
+            r"\brmdir\s+/[sS]\s+[cC]:\\\\",
             r"\bbcdedit\s",
             r"\bdiskpart\s",
             # Registry manipulation
@@ -65,7 +65,7 @@ class CommandSanitizer:
             r"\btaskkill\s+/[fF]\s+/[iI][mM]\s+.*\.exe",
             r"\btaskkill\s+/[fF]\s+/[tT]",
             # PowerShell dangerous commands
-            r"Remove-Item.*-[rR]ecurse.*[cC]:[/\\]",
+            r"Remove-Item.*-[rR]ecurse.*[cC]:\\\\",
             r"Get-WmiObject.*Win32_OperatingSystem.*Reboot",
             r"Stop-Computer\s+-Force",
             r"Restart-Computer\s+-Force",

@@ -5,14 +5,11 @@ Enhanced Bash/Shell command execution tool with improved process management.
 import asyncio
 import io
 import os
-import platform
 import shlex
-import shutil
 import signal
-import subprocess  # nosec B404
 import tempfile
 import time
-from contextlib import asynccontextmanager, suppress
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -63,18 +60,28 @@ class ProcessManager:
                     await asyncio.wait_for(process.wait(), timeout=2.0)
                 except asyncio.TimeoutError:
                     # Process is really stuck, try OS-level kill
-                    if platform.system() == "Windows" and process.pid:
+                    import platform
+
+                    if platform.system() == "Windows":
                         # Windows-specific process termination
-                        with suppress(OSError, subprocess.SubprocessError):
-                            subprocess.run(  # nosec B603 B607
-                                ["taskkill", "/F", "/T", "/PID", str(process.pid)],
-                                check=False,
-                                capture_output=True,
-                            )
-                    elif hasattr(os, "killpg") and process.pid:
+                        if process.pid:
+                            try:
+                                import subprocess  # nosec B404
+
+                                subprocess.run(  # nosec B603 B607
+                                    ["taskkill", "/F", "/T", "/PID", str(process.pid)],
+                                    check=False,
+                                    capture_output=True,
+                                )
+                            except (OSError, subprocess.SubprocessError):
+                                pass
+                    else:
                         # Unix-specific process group kill
-                        with suppress(OSError, ProcessLookupError):
-                            os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+                        if hasattr(os, "killpg") and process.pid:
+                            try:
+                                os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+                            except (OSError, ProcessLookupError):
+                                pass
         except (ProcessLookupError, OSError):
             # Process already dead
             pass
@@ -311,6 +318,9 @@ class BashTool(Tool):
 
     def _prepare_shell_command(self, command: str, shell: str) -> List[str]:
         """Prepare shell command for execution with proper sanitization."""
+        import platform
+        import shutil
+
         # Windows-specific handling
         if platform.system() == "Windows":
             # On Windows, use cmd.exe or PowerShell
@@ -318,27 +328,11 @@ class BashTool(Tool):
                 # Use PowerShell if requested and available
                 powershell_path = shutil.which("pwsh") or shutil.which("powershell")
                 if powershell_path:
-                    # Use ExecutionPolicy Bypass to avoid script execution restrictions
-                    # and wrap command in quotes to prevent injection
-                    return [
-                        powershell_path,
-                        "-ExecutionPolicy",
-                        "Bypass",
-                        "-Command",
-                        f"& {{{command}}}",
-                    ]
+                    return [powershell_path, "-Command", command]
 
             # Default to cmd.exe on Windows
             cmd_path = shutil.which("cmd") or "cmd.exe"
-            # Escape the command for cmd.exe to prevent injection
-            escaped_command = (
-                command.replace("^", "^^")
-                .replace("&", "^&")
-                .replace("|", "^|")
-                .replace("<", "^<")
-                .replace(">", "^>")
-            )
-            return [cmd_path, "/c", escaped_command]
+            return [cmd_path, "/c", command]
 
         # Unix-like systems
         shell_map = {
@@ -390,6 +384,8 @@ class BashTool(Tool):
             }
 
             # Set up process group for better cleanup on Unix
+            import platform
+
             if platform.system() != "Windows" and hasattr(os, "setsid"):
                 kwargs["start_new_session"] = True  # More portable than preexec_fn
 
@@ -496,17 +492,8 @@ class BashTool(Tool):
                             "execution_time": time.time() - start_time,
                         }
                 else:
-                    # No output capture, but still need to handle input_data
+                    # No output capture
                     try:
-                        # Send input data if provided, even without capturing output
-                        if input_data:
-                            input_bytes = input_data.encode("utf-8", errors="replace")
-                            # Send input and close stdin
-                            if process.stdin:
-                                process.stdin.write(input_bytes)
-                                await process.stdin.drain()
-                                process.stdin.close()
-
                         if timeout > 0:
                             return_code = await asyncio.wait_for(
                                 process.wait(), timeout=timeout
@@ -781,67 +768,75 @@ class ScriptTool(Tool):
 
             extension = script_extensions.get(script_type, ".sh")
 
-            # Create temporary script file (Windows-compatible approach)
-            fd, script_path = tempfile.mkstemp(
+            with tempfile.NamedTemporaryFile(
+                mode="w",
                 suffix=extension,
-                dir=tempfile.gettempdir(),
-            )
+                delete=not save_script,
+                encoding="utf-8",
+                dir=tempfile.gettempdir(),  # Use system temp dir
+            ) as script_file:
 
-            try:
-                # Write and close the file before execution (Windows compatibility)
-                with os.fdopen(fd, "w", encoding="utf-8") as script_file:
-                    # Add shebang if needed (Unix only)
-                    if platform.system() != "Windows":
-                        if script_type == "bash":
-                            script_file.write("#!/bin/bash\nset -e\n\n")
-                        elif script_type == "python":
-                            script_file.write("#!/usr/bin/env python3\n\n")
-                        elif script_type in ["node", "javascript"]:
-                            script_file.write("#!/usr/bin/env node\n\n")
+                # Add shebang if needed (Unix only)
+                import platform
 
-                    script_file.write(script_content)
+                if platform.system() != "Windows":
+                    if script_type == "bash":
+                        script_file.write("#!/bin/bash\nset -e\n\n")
+                    elif script_type == "python":
+                        script_file.write("#!/usr/bin/env python3\n\n")
+                    elif script_type in ["node", "javascript"]:
+                        script_file.write("#!/usr/bin/env node\n\n")
+
+                script_file.write(script_content)
+                script_file.flush()
 
                 # Make script executable (Unix only)
                 if platform.system() != "Windows":
-                    os.chmod(script_path, 0o700)  # User read/write/execute only
+                    os.chmod(script_file.name, 0o700)  # User read/write/execute only
 
                 # Prepare execution command
+                import shutil
+
                 if script_type == "bash":
                     if platform.system() == "Windows":
-                        # On Windows, check if bash is available
+                        # Use cmd or find bash on Windows
                         bash_path = shutil.which("bash") or shutil.which("git-bash")
-                        if not bash_path:
-                            return ToolResult(
-                                success=False,
-                                output="",
-                                error=(
-                                    "Bash is not available on this Windows system. "
-                                    "Please install Git for Windows (Git Bash), "
-                                    "Windows Subsystem for Linux (WSL), or use "
-                                    "script_type='python' for cross-platform scripts."
-                                ),
-                            )
-                        cmd = [bash_path, script_path]
+                        if bash_path:
+                            cmd = [bash_path, script_file.name]
+                        else:
+                            # Fallback to cmd reading the script
+                            cmd = [
+                                shutil.which("cmd") or "cmd.exe",
+                                "/c",
+                                f"type {script_file.name} | cmd",
+                            ]
                     else:
-                        cmd = [shutil.which("bash") or "bash", script_path]
+                        cmd = [shutil.which("bash") or "bash", script_file.name]
                 elif script_type == "python":
                     python_cmd = (
                         shutil.which("python3") or shutil.which("python") or "python"
                     )
-                    cmd = [python_cmd, script_path]
+                    cmd = [python_cmd, script_file.name]
                 elif script_type in ["node", "javascript"]:
                     node_cmd = shutil.which("node") or "node"
-                    cmd = [node_cmd, script_path]
+                    cmd = [node_cmd, script_file.name]
                 else:
                     if platform.system() == "Windows":
-                        cmd = [shutil.which("cmd") or "cmd.exe", "/c", script_path]
+                        cmd = [shutil.which("cmd") or "cmd.exe", "/c", script_file.name]
                     else:
-                        cmd = [shutil.which("sh") or "sh", script_path]
+                        cmd = [shutil.which("sh") or "sh", script_file.name]
 
-                # Execute script directly without going through shell wrapper
-                # This avoids quoting issues with paths containing spaces
-                result = await self._execute_script_direct(
-                    cmd, work_dir or Path("."), timeout, env_vars
+                # Execute script using BashTool
+                bash_tool = BashTool()
+                command_str = " ".join(shlex.quote(arg) for arg in cmd)
+
+                result = await bash_tool.execute(
+                    command=command_str,
+                    working_dir=str(work_dir),
+                    timeout=timeout,
+                    env_vars=env_vars,
+                    safe_mode=False,  # Scripts are created by us
+                    show_command=True,
                 )
 
                 # Add script info to metadata
@@ -850,137 +845,20 @@ class ScriptTool(Tool):
                         {
                             "script_type": script_type,
                             "script_path": (
-                                script_path if save_script else "temporary"
+                                script_file.name if save_script else "temporary"
                             ),
                             "script_size": len(script_content),
                         }
                     )
 
                 if save_script:
-                    result.output = f"Script saved to: {script_path}\n\n" + (
+                    result.output = f"Script saved to: {script_file.name}\n\n" + (
                         result.output or ""
                     )
 
                 return result
 
-            finally:
-                # Clean up temporary file if not saving
-                if not save_script:
-                    try:
-                        os.unlink(script_path)
-                    except (OSError, FileNotFoundError):
-                        pass  # File already deleted or inaccessible
-
         except Exception as e:
             return ToolResult(
                 success=False, output="", error=f"Script execution failed: {str(e)}"
-            )
-
-    async def _execute_script_direct(
-        self, cmd: List[str], work_dir: Path, timeout: int, env_vars: dict
-    ) -> ToolResult:
-        """Execute script directly using subprocess without shell wrapper."""
-        import time
-
-        start_time = time.time()
-
-        try:
-            # Prepare environment
-            env = os.environ.copy()
-            if env_vars:
-                env.update(env_vars)
-
-            # Execute directly using subprocess
-            process = None
-            try:
-                # Set up process group for better cleanup on Unix
-                start_new_session = platform.system() != "Windows" and hasattr(
-                    os, "setsid"
-                )
-
-                process = await asyncio.create_subprocess_exec(
-                    *cmd,
-                    cwd=str(work_dir),
-                    env=env,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                    start_new_session=start_new_session,
-                )
-
-                try:
-                    if timeout > 0:
-                        stdout_bytes, stderr_bytes = await asyncio.wait_for(
-                            process.communicate(), timeout=timeout
-                        )
-                    else:
-                        stdout_bytes, stderr_bytes = await process.communicate()
-
-                    # Decode output
-                    stdout = (
-                        stdout_bytes.decode("utf-8", errors="replace")
-                        if stdout_bytes
-                        else ""
-                    )
-                    stderr = (
-                        stderr_bytes.decode("utf-8", errors="replace")
-                        if stderr_bytes
-                        else ""
-                    )
-
-                    return_code = process.returncode
-                    execution_time = time.time() - start_time
-
-                    output_lines = [f"$ {' '.join(cmd)}", ""]
-                    if stdout:
-                        output_lines.append(stdout.rstrip())
-
-                    return ToolResult(
-                        success=return_code == 0,
-                        output="\n".join(output_lines).rstrip(),
-                        error=stderr.rstrip() if stderr else None,
-                        metadata={
-                            "command": " ".join(cmd),
-                            "working_dir": str(work_dir),
-                            "return_code": return_code,
-                            "execution_time": execution_time,
-                        },
-                    )
-
-                except asyncio.TimeoutError:
-                    return ToolResult(
-                        success=False,
-                        output="",
-                        error=f"Script timed out after {timeout} seconds",
-                        metadata={
-                            "command": " ".join(cmd),
-                            "return_code": -15,
-                            "execution_time": time.time() - start_time,
-                        },
-                    )
-
-            finally:
-                # Clean up process
-                if process and process.returncode is None:
-                    try:
-                        process.terminate()
-                        await asyncio.wait_for(process.wait(), timeout=5.0)
-                    except asyncio.TimeoutError:
-                        try:
-                            process.kill()
-                            await asyncio.wait_for(process.wait(), timeout=2.0)
-                        except asyncio.TimeoutError:
-                            pass
-                    except Exception:  # nosec B110
-                        pass
-
-        except Exception as e:
-            return ToolResult(
-                success=False,
-                output="",
-                error=f"Script execution failed: {str(e)}",
-                metadata={
-                    "command": " ".join(cmd),
-                    "return_code": -1,
-                    "execution_time": time.time() - start_time,
-                },
             )
