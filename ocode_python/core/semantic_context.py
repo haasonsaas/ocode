@@ -438,9 +438,7 @@ class SemanticContextBuilder:
         for semantic_file in semantic_files:
             score = 0.0
 
-            # Ensure path is a Path object (mypy thinks unreachable but it's not)
-            if not isinstance(semantic_file.path, Path):  # pragma: no cover
-                semantic_file.path = Path(semantic_file.path)
+            # Path is guaranteed to be a Path object from creation
 
             # Main files get higher scores
             if semantic_file.path.name in [
