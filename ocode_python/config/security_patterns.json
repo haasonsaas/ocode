@@ -13,38 +13,38 @@
         "umount",
         "sudo rm",
         "sudo dd",
-        "curl.*\\|.*bash",
-        "wget.*\\|.*bash",
-        "\\$\\(",
+        "curl.*\\\\|.*bash",
+        "wget.*\\\\|.*bash",
+        "\\\\$",
         "`",
         "&&.*(?:rm|dd|mkfs)",
-        "\\|\\|.*(?:rm|dd|mkfs)",
+        "\\\\|\\\\|.*(?:rm|dd|mkfs)",
         ";.*(?:rm|dd|mkfs)"
       ]
     },
     "requires_confirmation": {
       "description": "Commands that require user confirmation",
       "patterns": [
-        "\\|[^|]",
-        "grep\\s",
-        "sort\\s",
-        "wc\\s",
-        "curl\\s",
-        "wget\\s",
-        "tar\\s",
-        "chmod\\s",
-        "chown\\s",
-        "rm\\s",
-        "mv\\s",
-        "cp\\s.*-r",
+        "\\\\|[^|]",
+        "grep\\\\s",
+        "sort\\\\s",
+        "wc\\\\s",
+        "curl\\\\s",
+        "wget\\\\s",
+        "tar\\\\s",
+        "chmod\\\\s",
+        "chown\\\\s",
+        "rm\\\\s",
+        "mv\\\\s",
+        "cp\\\\s.*-r",
         "find.*-delete",
         "xargs",
-        "sed\\s.*-i",
-        "awk\\s",
+        "sed\\\\s.*-i",
+        "awk\\\\s",
         "python.*-c",
-        "node\\s.*-e",
-        "eval\\s",
-        "exec\\s"
+        "node\\\\s.*-e",
+        "eval\\\\s",
+        "exec\\\\s"
       ]
     },
     "redirection_blocked": {
@@ -61,20 +61,20 @@
       "patterns": [
         ";",
         "&&",
-        "\\|\\|"
+        "\\\\|\\\\|"
       ]
     }
   },
   "safe_pipe_exceptions": {
     "description": "Pipe patterns that are considered safe and don't require confirmation",
     "patterns": [
-      "\\|\\s*wc\\s*-l",
-      "\\|\\s*head",
-      "\\|\\s*tail",
-      "\\|\\s*sort\\s*$",
-      "\\|\\s*uniq\\s*$",
-      "\\|\\s*cat\\s*$",
-      "\\|\\s*grep\\s+[^|;&>]*$"
+      "\\\\|\\\\s*wc\\\\s*-l",
+      "\\\\|\\\\s*head",
+      "\\\\|\\\\s*tail",
+      "\\\\|\\\\s*sort\\\\s*$",
+      "\\\\|\\\\s*uniq\\\\s*$",
+      "\\\\|\\\\s*cat\\\\s*$",
+      "\\\\|\\\\s*grep\\\\s+[^|;&>]*$"
     ]
   },
   "settings": {
