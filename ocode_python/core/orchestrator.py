@@ -534,6 +534,33 @@ class AdvancedOrchestrator:
                 logging.error(f"Worker loop error: {e}")
                 await asyncio.sleep(1.0)
 
+    async def execute_tool_with_context(
+        self,
+        tool_name: str,
+        arguments: Dict[str, Any],
+        context: Optional[Dict[str, Any]] = None,
+    ) -> ToolResult:
+        """Execute tool directly with context, bypassing queue for execution."""
+        # Add context to arguments if provided
+        if context:
+            arguments = {**arguments, "_context": context}
+
+        task = CommandTask(
+            task_id=str(uuid.uuid4()),
+            tool_name=tool_name,
+            arguments=arguments,
+            priority=Priority.HIGH,  # Direct execution gets high priority
+        )
+
+        # Execute immediately with retry logic
+        return await self.retry_manager.execute_with_retry(
+            task,
+            lambda t: self.concurrent_executor._execute_single_task(
+                t, self.tool_registry, self.side_effect_broker
+            ),
+            self.side_effect_broker,
+        )
+
     def get_metrics(self) -> Dict[str, Any]:
         """Get orchestrator metrics."""
         return {

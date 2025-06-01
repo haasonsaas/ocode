@@ -51,6 +51,19 @@ DEFAULT_CONFIG = {
         ".vscode",
     ],
     "mcp_servers": {},
+    "architecture": {
+        "enable_advanced_orchestrator": True,
+        "enable_stream_processing": True,
+        "enable_semantic_context": True,
+        "enable_predictive_execution": True,
+        "enable_dynamic_context": True,
+        "orchestrator_max_concurrent": 5,
+        "stream_processor_batch_size": 1048576,  # 1MB
+        "semantic_context_max_files": 20,
+        "embedding_model": "all-MiniLM-L6-v2",
+        "predictive_cache_warm": True,
+        "context_expansion_factor": 1.5,
+    },
 }
 
 

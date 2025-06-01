@@ -29,8 +29,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
           pip install -r requirements-dev.txt
-          # Install optional dependencies for type checking
-          pip install numpy sentence-transformers || true
+          # Install optional semantic dependencies for full feature testing
+          pip install numpy sentence-transformers
 
       - name: Check code formatting with black
         run: python -m black --check --diff ocode_python/ tests/
@@ -125,6 +125,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
           pip install -r requirements-dev.txt
+          # Install semantic dependencies for full testing
+          pip install numpy sentence-transformers
 
       - name: Run unit tests
         run: pytest tests/unit/ -v --cov=ocode_python --cov-report=xml --cov-report=term

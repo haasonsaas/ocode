@@ -54,6 +54,13 @@ dev = [
     "types-pyyaml>=6.0",
     "types-requests>=2.31",
 ]
+semantic = [
+    "numpy>=1.24.0",
+    "sentence-transformers>=2.2.0",
+]
+full = [
+    "ocode[dev,semantic]",
+]
 
 [project.scripts]
 ocode = "ocode_python.core.cli:main"

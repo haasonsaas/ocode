@@ -126,6 +126,18 @@ elif [ -n "$OCODE_INSTALL_URL" ]; then
     pip install "$OCODE_INSTALL_URL"
 fi
 
+# Install semantic dependencies for enhanced features
+echo ""
+read -p "Do you want to install semantic features for enhanced context selection? (recommended) [Y/n]: " -n 1 -r
+echo
+if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+    print_status "Installing semantic dependencies (numpy, sentence-transformers)..."
+    pip install numpy sentence-transformers
+    print_success "Semantic features installed - you'll get intelligent file selection!"
+else
+    print_warning "Skipping semantic features - will use keyword-based fallback"
+fi
+
 # Check if ocode command is available
 if ! command -v ocode &> /dev/null; then
     echo "⚠️  ocode command not found in PATH"
@@ -245,6 +257,19 @@ cat > "$OCODE_DIR/settings.json" << EOF
     "allow_file_write": true,
     "allow_shell_exec": false,
     "allow_git_ops": true
+  },
+  "architecture": {
+    "enable_advanced_orchestrator": true,
+    "enable_stream_processing": true,
+    "enable_semantic_context": true,
+    "enable_predictive_execution": true,
+    "enable_dynamic_context": true,
+    "orchestrator_max_concurrent": 5,
+    "stream_processor_batch_size": 1048576,
+    "semantic_context_max_files": 20,
+    "embedding_model": "all-MiniLM-L6-v2",
+    "predictive_cache_warm": true,
+    "context_expansion_factor": 1.5
   }
 }
 EOF

@@ -14,7 +14,10 @@ from ..utils.auth import AuthenticationManager
 from ..utils.config import ConfigManager
 from .api_client import CompletionRequest, Message, OllamaAPIClient
 from .context_manager import ContextManager, ProjectContext
+from .orchestrator import AdvancedOrchestrator
+from .semantic_context import DynamicContextManager, SemanticContextBuilder
 from .session import SessionManager
+from .stream_processor import StreamProcessor
 
 
 @dataclass
@@ -121,6 +124,33 @@ class OCodeEngine:
         # Register all available tools with the registry
         # This makes them available for AI function calling
         self.tool_registry.register_core_tools()
+
+        # Initialize advanced architecture components
+        arch_config = self.config.get("architecture", {})
+        # Advanced orchestrator for priority-based command queuing and side effects
+        if arch_config.get("enable_advanced_orchestrator", True):
+            max_concurrent = arch_config.get("orchestrator_max_concurrent", 5)
+            self.orchestrator = AdvancedOrchestrator(self.tool_registry, max_concurrent)
+        else:
+            self.orchestrator = None
+
+        # Stream processor for read-write pipeline separation and intelligent batching
+        if arch_config.get("enable_stream_processing", True):
+            self.stream_processor = StreamProcessor(self.context_manager)
+        else:
+            self.stream_processor = None
+
+        # Semantic context builder for embedding-based file selection
+        if arch_config.get("enable_semantic_context", True):
+            self.semantic_context_builder = SemanticContextBuilder(self.context_manager)
+        else:
+            self.semantic_context_builder = None
+
+        # Dynamic context manager for intelligent context expansion
+        if arch_config.get("enable_dynamic_context", True):
+            self.dynamic_context_manager = DynamicContextManager(self.context_manager)
+        else:
+            self.dynamic_context_manager = None
 
         # Processing state management
         # These track the current conversation and processing state
@@ -440,7 +470,7 @@ Before responding, consider:
     async def _prepare_context(self, query: str) -> ProjectContext:
         """Prepare project context for the query.
 
-        Analyzes the project and builds relevant context based on the query.
+        Uses advanced semantic context selection and dynamic expansion when available.
         Shows progress information if verbose mode is enabled.
 
         Args:
@@ -452,9 +482,26 @@ Before responding, consider:
         if self.verbose:
             print("🔍 Analyzing project context...")
 
-        context = await self.context_manager.build_context(
-            query=query, max_files=self.config.get("max_context_files", 20)
-        )
+        # Use dynamic context manager if available for enhanced context selection
+        if self.dynamic_context_manager:
+            arch_config = self.config.get("architecture", {})
+            max_files = arch_config.get("semantic_context_max_files", 20)
+            expansion_factor = arch_config.get("context_expansion_factor", 1.5)
+            context = await self.dynamic_context_manager.build_dynamic_context(
+                query=query,
+                initial_max_files=max_files,
+                expansion_factor=expansion_factor,
+            )
+            if self.verbose:
+                insights = self.dynamic_context_manager.get_context_insights()
+                if insights:
+                    embeddings_enabled = insights.get("embeddings_enabled", False)
+                    print(f"🧠 Semantic analysis: {embeddings_enabled}")
+        else:
+            # Fallback to basic context manager
+            context = await self.context_manager.build_context(
+                query=query, max_files=self.config.get("max_context_files", 20)
+            )
 
         if self.verbose:
             print(f"📁 Analyzed {len(context.files)} files")
@@ -991,6 +1038,7 @@ When a user asks you to perform an action, call the appropriate function."""
 
         Handles tool execution with smart defaults for memory operations,
         confirmation requests for dangerous commands, and error handling.
+        Uses the AdvancedOrchestrator when available for enhanced execution.
 
         Args:
             tool_name: Name of the tool to execute.
@@ -1071,7 +1119,19 @@ When a user asks you to perform an action, call the appropriate function."""
                 print(f"Memory read arguments: {arguments}")
 
         try:
-            result = await self.tool_registry.execute_tool(registry_name, **arguments)
+            # Use advanced orchestrator if available for enhanced tool execution
+            if self.orchestrator:
+                # Execute through orchestrator for priority queuing and side effects
+                result = await self.orchestrator.execute_tool_with_context(
+                    tool_name=registry_name,
+                    arguments=arguments,
+                    context={"query": query, "engine": self},
+                )
+            else:
+                # Fallback to direct tool registry execution
+                result = await self.tool_registry.execute_tool(
+                    registry_name, **arguments
+                )
 
             # Handle confirmation requests for shell commands
             if (
@@ -1091,9 +1151,16 @@ When a user asks you to perform an action, call the appropriate function."""
                 if confirmed:
                     # Re-execute with confirmation
                     arguments["confirmed"] = True
-                    result = await self.tool_registry.execute_tool(
-                        registry_name, **arguments
-                    )
+                    if self.orchestrator:
+                        result = await self.orchestrator.execute_tool_with_context(
+                            tool_name=registry_name,
+                            arguments=arguments,
+                            context={"query": query, "engine": self},
+                        )
+                    else:
+                        result = await self.tool_registry.execute_tool(
+                            registry_name, **arguments
+                        )
                 else:
                     result = ToolResult(
                         success=False, output="", error="Command cancelled by user"
@@ -1516,7 +1583,34 @@ When a user asks you to perform an action, call the appropriate function."""
             "conversation_length": len(self.conversation_history),
             "tools_available": len(self.tool_registry.tools),
             "project_root": str(self.context_manager.root),
+            "orchestrator_enabled": self.orchestrator is not None,
+            "stream_processor_enabled": self.stream_processor is not None,
+            "semantic_context_enabled": self.semantic_context_builder is not None,
+            "dynamic_context_enabled": self.dynamic_context_manager is not None,
         }
+
+    async def start_orchestrator(self) -> None:
+        """Start the advanced orchestrator if available."""
+        if self.orchestrator:
+            await self.orchestrator.start()
+            if self.verbose:
+                print("🚀 Advanced orchestrator started")
+
+    async def stop_orchestrator(self) -> None:
+        """Stop the advanced orchestrator if available."""
+        if self.orchestrator:
+            await self.orchestrator.stop()
+            if self.verbose:
+                print("🛑 Advanced orchestrator stopped")
+
+    async def __aenter__(self):
+        """Async context manager entry - start orchestrator."""
+        await self.start_orchestrator()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit - stop orchestrator."""
+        await self.stop_orchestrator()
 
 
 async def main() -> None:
