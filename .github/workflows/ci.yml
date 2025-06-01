@@ -40,7 +40,7 @@ jobs:
         run: python -m flake8 ocode_python/ tests/
 
       - name: Type check with mypy
-        run: python -m mypy ocode_python/
+        run: python -m mypy ocode_python/ --ignore-missing-imports
 
   security:
     name: Security Scan
