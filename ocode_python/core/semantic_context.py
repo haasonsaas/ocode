@@ -267,6 +267,12 @@ class SemanticContextBuilder:
             # Get query embedding
             query_embedding = self.embeddings_model.encode(query)
 
+            # Convert to numpy array if it's a tensor
+            if hasattr(query_embedding, "numpy"):
+                query_embedding = query_embedding.numpy()
+            elif not isinstance(query_embedding, np.ndarray):
+                query_embedding = np.array(query_embedding)
+
             # Process files in batches to avoid memory issues
             batch_size = 10
             for i in range(0, len(semantic_files), batch_size):
@@ -313,6 +319,12 @@ class SemanticContextBuilder:
         if texts_to_encode and self.embeddings_model:
             try:
                 embeddings = self.embeddings_model.encode(texts_to_encode)
+
+                # Convert to numpy array if it's a tensor
+                if hasattr(embeddings, "numpy"):
+                    embeddings = embeddings.numpy()
+                elif not isinstance(embeddings, np.ndarray):
+                    embeddings = np.array(embeddings)
 
                 for i, (semantic_file, content_hash) in enumerate(files_to_encode):
                     embedding = embeddings[i]
