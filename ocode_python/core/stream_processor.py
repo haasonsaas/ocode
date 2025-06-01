@@ -93,8 +93,8 @@ class ContextBatcher:
         # Group files by type and estimated processing complexity
         file_groups = self._group_files_by_characteristics(files)
 
-        batches = []
-        current_batch = []
+        batches: List[List[Path]] = []
+        current_batch: List[Path] = []
         current_size = 0
 
         # Process groups in order of priority
@@ -120,7 +120,7 @@ class ContextBatcher:
         self, files: List[Path]
     ) -> Dict[str, List[Path]]:
         """Group files by their processing characteristics."""
-        groups = {
+        groups: Dict[str, List[Path]] = {
             "source_code": [],  # .py, .js, .ts - needs symbol extraction
             "config": [],  # .json, .yaml, .yml - structured data
             "documentation": [],  # .md, .rst, .txt - text processing
@@ -323,7 +323,7 @@ class StreamProcessor:
             cache_key = f"{operation.tool_name}:{hash(str(operation.arguments))}"
 
             if cache_key in self.read_cache:
-                return self.read_cache[cache_key]
+                return self.read_cache[cache_key]  # type: ignore[no-any-return]
 
             # Execute the read operation
             from ..tools.base import ToolRegistry
@@ -349,9 +349,10 @@ class StreamProcessor:
             registry = ToolRegistry()
             registry.register_core_tools()
 
-            return await registry.execute_tool(
+            result = await registry.execute_tool(
                 operation.tool_name, **operation.arguments
             )
+            return result
 
     async def _execute_analyze_operation(self, operation: Operation) -> ToolResult:
         """Execute an analysis operation."""
@@ -360,7 +361,8 @@ class StreamProcessor:
         registry = ToolRegistry()
         registry.register_core_tools()
 
-        return await registry.execute_tool(operation.tool_name, **operation.arguments)
+        result = await registry.execute_tool(operation.tool_name, **operation.arguments)
+        return result
 
     async def stream_analysis(
         self, read_results: List[OperationResult]

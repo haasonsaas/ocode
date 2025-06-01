@@ -12,7 +12,7 @@ import sqlite3
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Union
 
 try:
     # Try to import sentence-transformers for semantic embeddings
@@ -113,7 +113,7 @@ class EmbeddingCache:
                 if len(self.memory_cache) < self.max_memory_cache:
                     self.memory_cache[cache_key] = embedding
 
-                return embedding
+                return embedding  # type: ignore[no-any-return]
 
         except sqlite3.Error as e:
             logging.warning(f"Error reading embedding cache: {e}")
@@ -208,7 +208,7 @@ class SemanticContextBuilder:
         ]
 
     async def build_semantic_context(
-        self, query: str, files: Dict[Path, str], max_files: int = 20
+        self, query: str, files: Dict[Union[Path, str], str], max_files: int = 20
     ) -> List[SemanticFile]:
         """Build context using semantic similarity and intelligent scoring."""
         if not files:
@@ -218,7 +218,7 @@ class SemanticContextBuilder:
         semantic_files = []
         for file_path, content in files.items():
             # Ensure file_path is a Path object
-            if isinstance(file_path, str):
+            if not isinstance(file_path, Path):
                 file_path = Path(file_path)
             semantic_file = SemanticFile(
                 path=file_path, content=content, metadata={"size": len(content)}
@@ -287,7 +287,7 @@ class SemanticContextBuilder:
 
         for semantic_file in batch:
             content_hash = hashlib.md5(  # nosec B324
-                semantic_file.content.encode(), usedforsecurity=False
+                semantic_file.content.encode()
             ).hexdigest()
 
             # Check cache first
@@ -310,7 +310,7 @@ class SemanticContextBuilder:
                 files_to_encode.append((semantic_file, content_hash))
 
         # Compute embeddings for files not in cache
-        if texts_to_encode:
+        if texts_to_encode and self.embeddings_model:
             try:
                 embeddings = self.embeddings_model.encode(texts_to_encode)
 
@@ -438,8 +438,8 @@ class SemanticContextBuilder:
         for semantic_file in semantic_files:
             score = 0.0
 
-            # Ensure path is a Path object
-            if isinstance(semantic_file.path, str):
+            # Ensure path is a Path object (mypy thinks unreachable but it's not)
+            if not isinstance(semantic_file.path, Path):  # pragma: no cover
                 semantic_file.path = Path(semantic_file.path)
 
             # Main files get higher scores
@@ -465,10 +465,10 @@ class SemanticContextBuilder:
 
             semantic_file.frequency_score = score
 
-    def _compute_path_score(self, file_path: Path, query: str) -> float:
+    def _compute_path_score(self, file_path: Union[Path, str], query: str) -> float:
         """Compute score based on path relevance to query."""
         # Ensure file_path is a Path object
-        if isinstance(file_path, str):
+        if not isinstance(file_path, Path):
             file_path = Path(file_path)
 
         query_lower = query.lower()
@@ -488,7 +488,10 @@ class SemanticContextBuilder:
         return min(score, 1.0)
 
     async def _apply_context_expansion(
-        self, query: str, selected_files: List[SemanticFile], all_files: Dict[Path, str]
+        self,
+        query: str,
+        selected_files: List[SemanticFile],
+        all_files: Dict[Union[Path, str], str],
     ) -> List[SemanticFile]:
         """Apply context expansion rules."""
         import re
@@ -516,7 +519,7 @@ class SemanticContextBuilder:
         self,
         rule: ContextExpansionRule,
         selected_files: List[SemanticFile],
-        all_files: Dict[Path, str],
+        all_files: Dict[Union[Path, str], str],
     ) -> List[SemanticFile]:
         """Expand context based on a specific rule."""
         if rule.expansion_type == "imports":
@@ -528,7 +531,7 @@ class SemanticContextBuilder:
         return []
 
     def _expand_by_imports(
-        self, selected_files: List[SemanticFile], all_files: Dict[Path, str]
+        self, selected_files: List[SemanticFile], all_files: Dict[Union[Path, str], str]
     ) -> List[SemanticFile]:
         """Expand context by following import chains."""
         additional_files = []
@@ -538,7 +541,7 @@ class SemanticContextBuilder:
             )
             for imp in imports:
                 for file_path, content in all_files.items():
-                    if isinstance(file_path, str):
+                    if not isinstance(file_path, Path):
                         file_path = Path(file_path)
                     if imp in str(file_path) or file_path.stem == imp:
                         additional_file = SemanticFile(
@@ -552,14 +555,14 @@ class SemanticContextBuilder:
         return additional_files
 
     def _expand_by_tests(
-        self, selected_files: List[SemanticFile], all_files: Dict[Path, str]
+        self, selected_files: List[SemanticFile], all_files: Dict[Union[Path, str], str]
     ) -> List[SemanticFile]:
         """Expand context by finding related test files."""
         additional_files = []
         for semantic_file in selected_files:
             stem = semantic_file.path.stem
             for file_path, content in all_files.items():
-                if isinstance(file_path, str):
+                if not isinstance(file_path, Path):
                     file_path = Path(file_path)
                 if "test" in file_path.name.lower() and stem in file_path.name.lower():
                     additional_file = SemanticFile(
@@ -572,12 +575,14 @@ class SemanticContextBuilder:
                     additional_files.append(additional_file)
         return additional_files
 
-    def _expand_by_config(self, all_files: Dict[Path, str]) -> List[SemanticFile]:
+    def _expand_by_config(
+        self, all_files: Dict[Union[Path, str], str]
+    ) -> List[SemanticFile]:
         """Expand context by finding configuration files."""
         additional_files = []
         config_extensions = {".json", ".yaml", ".yml", ".toml", ".ini", ".env"}
         for file_path, content in all_files.items():
-            if isinstance(file_path, str):
+            if not isinstance(file_path, Path):
                 file_path = Path(file_path)
             if (
                 file_path.suffix in config_extensions
@@ -640,7 +645,7 @@ class DynamicContextManager:
         # Apply semantic analysis
         semantic_files = await self.semantic_builder.build_semantic_context(
             query,
-            base_context.files,
+            base_context.files,  # type: ignore[arg-type]
             max_files=int(initial_max_files * expansion_factor),
         )
 
@@ -707,7 +712,9 @@ class DynamicContextManager:
 
             # Apply semantic selection for expansion
             semantic_files = await self.semantic_builder.build_semantic_context(
-                expansion_hint, candidate_content, max_files=max_additional_files
+                expansion_hint,
+                candidate_content,  # type: ignore[arg-type]
+                max_files=max_additional_files,
             )
 
             additional_paths = [sf.path for sf in semantic_files]
@@ -744,7 +751,7 @@ class DynamicContextManager:
             return {}
 
         recent_queries = [entry["query"] for entry in self.context_history[-10:]]
-        frequent_files = {}
+        frequent_files: Dict[str, int] = {}
 
         for entry in self.context_history:
             for file_path in entry["selected_files"]:

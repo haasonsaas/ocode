@@ -84,9 +84,9 @@ class CommandQueue:
     """Priority-based command queue with dependency tracking."""
 
     def __init__(self):
-        self.high_priority = asyncio.Queue()
-        self.normal_priority = asyncio.Queue()
-        self.background = asyncio.Queue()
+        self.high_priority: asyncio.Queue[str] = asyncio.Queue()
+        self.normal_priority: asyncio.Queue[str] = asyncio.Queue()
+        self.background: asyncio.Queue[str] = asyncio.Queue()
         self.tasks: Dict[str, CommandTask] = {}
         self.completed_tasks: Dict[str, CommandTask] = {}
         self._lock = asyncio.Lock()
@@ -206,9 +206,9 @@ class RetryManager:
             try:
                 result = await executor_func(task)
 
-                if result.success:
-                    return result
-                elif self._is_retryable_error(result.error):
+                if result and result.success:
+                    return result  # type: ignore[no-any-return]
+                elif result and self._is_retryable_error(result.error):
                     last_error = result.error
                     if attempt < self.max_retries:
                         delay = self.base_delay * (2**attempt)
@@ -216,7 +216,7 @@ class RetryManager:
                         task.retry_count += 1
                         continue
 
-                return result
+                return result or ToolResult(success=False, output="", error="No result")
 
             except TransientError as e:
                 last_error = str(e)
@@ -299,8 +299,8 @@ class ConcurrentToolExecutor:
     ) -> List[List[CommandTask]]:
         """Group tasks that can be executed independently."""
         # Simple implementation: group by resource conflicts
-        groups = []
-        used_resources = set()
+        groups: List[List[CommandTask]] = []
+        used_resources: Set[str] = set()
 
         for task in tasks:
             task_resources = self._get_task_resources(task)
@@ -363,7 +363,7 @@ class ConcurrentToolExecutor:
         )
 
         # Convert exceptions to error results
-        processed_results = []
+        processed_results: List[ToolResult] = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
                 processed_results.append(
@@ -373,8 +373,12 @@ class ConcurrentToolExecutor:
                         error=f"Parallel execution error: {str(result)}",
                     )
                 )
-            else:
+            elif isinstance(result, ToolResult):
                 processed_results.append(result)
+            else:
+                processed_results.append(
+                    ToolResult(success=False, output="", error="Unknown result type")
+                )
 
         return processed_results
 
