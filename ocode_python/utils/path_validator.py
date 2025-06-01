@@ -27,7 +27,8 @@ class PathValidator:
 
         # Platform-specific dangerous characters
         if self.platform.startswith("win"):
-            self.dangerous_chars = set('<>:"|?*\x00')
+            # Note: colon is allowed in drive letters (C:), but dangerous elsewhere
+            self.dangerous_chars = set('<>"|?*\x00')
             self.reserved_names = {
                 "CON",
                 "PRN",
@@ -91,6 +92,36 @@ class PathValidator:
                         f"Path contains forbidden character: {repr(char)}",
                         None,
                     )
+
+            # Special handling for colons on Windows
+            if self.platform.startswith("win") and ":" in path_str:
+                # Allow drive letters (C:, D:, etc.) but block alternate data streams
+                import re
+
+                # Check for valid Windows drive patterns
+                drive_pattern = r"^[A-Za-z]:[/\\]"  # C:\ or C:/
+                drive_only_pattern = r"^[A-Za-z]:$"  # C:
+
+                # Count colons - should only be one for drive letter
+                colon_count = path_str.count(":")
+
+                if colon_count > 1:
+                    return (
+                        False,
+                        "Invalid colon usage (alternate data streams not allowed)",
+                        None,
+                    )
+                elif colon_count == 1:
+                    # Must be a drive letter pattern
+                    if not (
+                        re.match(drive_pattern, path_str)
+                        or re.match(drive_only_pattern, path_str)
+                    ):
+                        return (
+                            False,
+                            "Invalid colon usage (must be drive letter like C:)",
+                            None,
+                        )
 
             # Check for path traversal attempts
             if self._has_path_traversal(path_str):

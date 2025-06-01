@@ -196,7 +196,13 @@ class TestBashTool:
         # Test invalid command
         result = await tool.execute(command="nonexistentcommand12345")
         assert not result.success
-        assert "not found" in result.error or "command not found" in result.output
+        # Handle both Unix and Windows error messages
+        error_text = (result.error + " " + result.output).lower()
+        assert (
+            "not found" in error_text
+            or "command not found" in error_text
+            or "not recognized" in error_text
+        )
 
     @pytest.mark.asyncio
     async def test_script_tool(self):
