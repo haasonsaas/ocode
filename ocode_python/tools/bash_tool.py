@@ -814,34 +814,11 @@ class ScriptTool(Tool):
                     else:
                         cmd = [shutil.which("sh") or "sh", script_path]
 
-                # Execute script using BashTool
-                bash_tool = BashTool()
-                # Platform-specific command preparation
-                if platform.system() == "Windows":
-                    # On Windows, use the executable directly without shell wrapper
-                    command_str = " ".join(cmd)
-                    result = await bash_tool.execute(
-                        command=command_str,
-                        working_dir=str(work_dir),
-                        timeout=timeout,
-                        env_vars=env_vars,
-                        safe_mode=False,  # Scripts are created by us
-                        show_command=True,
-                        shell="cmd",  # Use cmd.exe directly  # nosec B604
-                        capture_output=True,  # Ensure output is captured
-                    )
-                else:
-                    # Unix: use proper quoting
-                    command_str = " ".join(shlex.quote(arg) for arg in cmd)
-                    result = await bash_tool.execute(
-                        command=command_str,
-                        working_dir=str(work_dir),
-                        timeout=timeout,
-                        env_vars=env_vars,
-                        safe_mode=False,  # Scripts are created by us
-                        show_command=True,
-                        capture_output=True,  # Ensure output is captured
-                    )
+                # Execute script directly without going through shell wrapper
+                # This avoids quoting issues with paths containing spaces
+                result = await self._execute_script_direct(
+                    cmd, work_dir or Path("."), timeout, env_vars
+                )
 
                 # Add script info to metadata
                 if result.metadata:
@@ -873,4 +850,113 @@ class ScriptTool(Tool):
         except Exception as e:
             return ToolResult(
                 success=False, output="", error=f"Script execution failed: {str(e)}"
+            )
+
+    async def _execute_script_direct(
+        self, cmd: List[str], work_dir: Path, timeout: int, env_vars: dict
+    ) -> ToolResult:
+        """Execute script directly using subprocess without shell wrapper."""
+        import time
+
+        start_time = time.time()
+
+        try:
+            # Prepare environment
+            env = os.environ.copy()
+            if env_vars:
+                env.update(env_vars)
+
+            # Execute directly using subprocess
+            process = None
+            try:
+                # Set up process group for better cleanup on Unix
+                start_new_session = platform.system() != "Windows" and hasattr(
+                    os, "setsid"
+                )
+
+                process = await asyncio.create_subprocess_exec(
+                    *cmd,
+                    cwd=str(work_dir),
+                    env=env,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    start_new_session=start_new_session,
+                )
+
+                try:
+                    if timeout > 0:
+                        stdout_bytes, stderr_bytes = await asyncio.wait_for(
+                            process.communicate(), timeout=timeout
+                        )
+                    else:
+                        stdout_bytes, stderr_bytes = await process.communicate()
+
+                    # Decode output
+                    stdout = (
+                        stdout_bytes.decode("utf-8", errors="replace")
+                        if stdout_bytes
+                        else ""
+                    )
+                    stderr = (
+                        stderr_bytes.decode("utf-8", errors="replace")
+                        if stderr_bytes
+                        else ""
+                    )
+
+                    return_code = process.returncode
+                    execution_time = time.time() - start_time
+
+                    output_lines = [f"$ {' '.join(cmd)}", ""]
+                    if stdout:
+                        output_lines.append(stdout.rstrip())
+
+                    return ToolResult(
+                        success=return_code == 0,
+                        output="\n".join(output_lines).rstrip(),
+                        error=stderr.rstrip() if stderr else None,
+                        metadata={
+                            "command": " ".join(cmd),
+                            "working_dir": str(work_dir),
+                            "return_code": return_code,
+                            "execution_time": execution_time,
+                        },
+                    )
+
+                except asyncio.TimeoutError:
+                    return ToolResult(
+                        success=False,
+                        output="",
+                        error=f"Script timed out after {timeout} seconds",
+                        metadata={
+                            "command": " ".join(cmd),
+                            "return_code": -15,
+                            "execution_time": time.time() - start_time,
+                        },
+                    )
+
+            finally:
+                # Clean up process
+                if process and process.returncode is None:
+                    try:
+                        process.terminate()
+                        await asyncio.wait_for(process.wait(), timeout=5.0)
+                    except asyncio.TimeoutError:
+                        try:
+                            process.kill()
+                            await asyncio.wait_for(process.wait(), timeout=2.0)
+                        except asyncio.TimeoutError:
+                            pass
+                    except Exception:  # nosec B110
+                        pass
+
+        except Exception as e:
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"Script execution failed: {str(e)}",
+                metadata={
+                    "command": " ".join(cmd),
+                    "return_code": -1,
+                    "execution_time": time.time() - start_time,
+                },
             )
