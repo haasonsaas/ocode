@@ -324,7 +324,8 @@ class SemanticContextBuilder:
                 if hasattr(embeddings, "numpy"):
                     embeddings = embeddings.numpy()  # type: ignore[attr-defined]
                 if not isinstance(embeddings, np.ndarray):
-                    embeddings = np.array(embeddings)  # type: ignore[arg-type]
+                    # type: ignore[arg-type,unreachable]
+                    embeddings = np.array(embeddings)
 
                 for i, (semantic_file, content_hash) in enumerate(files_to_encode):
                     embedding = embeddings[i]

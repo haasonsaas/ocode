@@ -125,40 +125,38 @@ class OCodeEngine:
         # This makes them available for AI function calling
         self.tool_registry.register_core_tools()
 
+        # Pre-declare architecture component attributes
+        self.orchestrator: Optional[AdvancedOrchestrator] = None
+        self.stream_processor: Optional[StreamProcessor] = None
+        self.semantic_context_builder: Optional[SemanticContextBuilder] = None
+        self.dynamic_context_manager: Optional[DynamicContextManager] = None
+
         # Initialize advanced architecture components
         arch_config = self.config.get("architecture", {})
         # Advanced orchestrator for priority-based command queuing and side effects
         if arch_config.get("enable_advanced_orchestrator", True):
             max_concurrent = arch_config.get("orchestrator_max_concurrent", 5)
-            self.orchestrator: Optional[AdvancedOrchestrator] = AdvancedOrchestrator(
-                self.tool_registry, max_concurrent
-            )
+            self.orchestrator = AdvancedOrchestrator(self.tool_registry, max_concurrent)
         else:
-            self.orchestrator: Optional[AdvancedOrchestrator] = None
+            self.orchestrator = None
 
         # Stream processor for read-write pipeline separation and intelligent batching
         if arch_config.get("enable_stream_processing", True):
-            self.stream_processor: Optional[StreamProcessor] = StreamProcessor(
-                self.context_manager
-            )
+            self.stream_processor = StreamProcessor(self.context_manager)
         else:
-            self.stream_processor: Optional[StreamProcessor] = None
+            self.stream_processor = None
 
         # Semantic context builder for embedding-based file selection
         if arch_config.get("enable_semantic_context", True):
-            self.semantic_context_builder: Optional[SemanticContextBuilder] = (
-                SemanticContextBuilder(self.context_manager)
-            )
+            self.semantic_context_builder = SemanticContextBuilder(self.context_manager)
         else:
-            self.semantic_context_builder: Optional[SemanticContextBuilder] = None
+            self.semantic_context_builder = None
 
         # Dynamic context manager for intelligent context expansion
         if arch_config.get("enable_dynamic_context", True):
-            self.dynamic_context_manager: Optional[DynamicContextManager] = (
-                DynamicContextManager(self.context_manager)
-            )
+            self.dynamic_context_manager = DynamicContextManager(self.context_manager)
         else:
-            self.dynamic_context_manager: Optional[DynamicContextManager] = None
+            self.dynamic_context_manager = None
 
         # Processing state management
         # These track the current conversation and processing state
