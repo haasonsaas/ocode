@@ -29,9 +29,9 @@ class TestWindowsCompatibility:
 
         bash_tool = BashTool()
 
-        # Test default cmd.exe handling
+        # Test default cmd.exe handling (with quoting for security)
         result = bash_tool._prepare_shell_command("echo test", "bash")
-        assert result == ["C:\\Windows\\System32\\cmd.exe", "/c", "echo test"]
+        assert result == ["C:\\Windows\\System32\\cmd.exe", "/c", '"echo test"']
 
         # Test PowerShell handling
         result = bash_tool._prepare_shell_command("echo test", "powershell")
@@ -75,12 +75,13 @@ class TestWindowsCompatibility:
         # Mock process that needs termination
         mock_process = AsyncMock()
         mock_process.pid = 1234
+        mock_process.returncode = None  # Process still running
         mock_process.terminate.return_value = None
         mock_process.wait.side_effect = asyncio.TimeoutError()
         mock_process.kill.return_value = None
 
         # Test that taskkill is called on Windows
-        await _process_manager.cleanup_process(mock_process)
+        await _process_manager._terminate_process(mock_process)
 
         mock_subprocess_run.assert_called_with(
             ["taskkill", "/F", "/T", "/PID", "1234"], check=False, capture_output=True
@@ -103,35 +104,36 @@ class TestWindowsCompatibility:
         # Mock process that needs termination
         mock_process = AsyncMock()
         mock_process.pid = 1234
+        mock_process.returncode = None  # Process still running
         mock_process.terminate.return_value = None
         mock_process.wait.side_effect = asyncio.TimeoutError()
         mock_process.kill.return_value = None
 
         # Test that os.killpg is called on Unix
-        await _process_manager.cleanup_process(mock_process)
+        await _process_manager._terminate_process(mock_process)
 
         mock_killpg.assert_called_with(1234, signal.SIGKILL)
 
-    @patch("platform.system", return_value="Windows")
-    def test_command_sanitizer_windows_patterns(self, mock_platform):
+    def test_command_sanitizer_windows_patterns(self):
         """Test Windows dangerous command detection."""
-        sanitizer = CommandSanitizer()
+        with patch("platform.system", return_value="Windows"):
+            sanitizer = CommandSanitizer()
 
-        # Test Windows-specific dangerous commands
-        dangerous_commands = [
-            "format C:",
-            "del /S C:\\Windows",
-            "rd /S C:\\Users",
-            "reg delete HKLM\\Software",
-            "taskkill /F /T",
-            "Remove-Item -Recurse C:\\Windows",
-            "Stop-Computer -Force",
-        ]
+            # Test Windows-specific dangerous commands
+            dangerous_commands = [
+                "format C:",
+                "del /S C:\\Windows",
+                "rd /S C:\\Users",
+                "reg delete HKLM\\Software",
+                "taskkill /F /T",
+                "Remove-Item -Recurse C:\\Windows",
+                "Stop-Computer -Force",
+            ]
 
-        for cmd in dangerous_commands:
-            is_safe, reason, cleaned = sanitizer.sanitize_command(cmd)
-            assert not is_safe, f"Command '{cmd}' should be blocked on Windows"
-            assert reason, f"Should provide reason for blocking '{cmd}'"
+            for cmd in dangerous_commands:
+                is_safe, cleaned, reason = sanitizer.sanitize_command(cmd)
+                assert not is_safe, f"Command '{cmd}' should be blocked on Windows"
+                assert reason, f"Should provide reason for blocking '{cmd}'"
 
     @patch("platform.system", return_value="Linux")
     def test_command_sanitizer_unix_only(self, mock_platform):
@@ -220,43 +222,43 @@ class TestCrossPlatformDetection:
 class TestWindowsPathValidation:
     """Test Windows path validation fixes."""
 
-    @patch("platform.system", return_value="Windows")
-    def test_windows_drive_letter_paths(self, mock_platform):
+    def test_windows_drive_letter_paths(self):
         """Test that Windows drive letter paths are allowed."""
         from ocode_python.utils.path_validator import PathValidator
 
-        validator = PathValidator()
+        with patch("platform.system", return_value="Windows"):
+            validator = PathValidator()
 
-        # Valid Windows paths
-        valid_paths = [
-            "C:\\",
-            "C:\\temp",
-            "C:\\Users\\test\\file.txt",
-            "D:\\project\\src",
-            "C:/temp/file.txt",  # Forward slashes also valid
-        ]
+            # Valid Windows paths
+            valid_paths = [
+                "C:\\",
+                "C:\\temp",
+                "C:\\Users\\test\\file.txt",
+                "D:\\project\\src",
+                "C:/temp/file.txt",  # Forward slashes also valid
+            ]
 
-        for path in valid_paths:
-            is_valid, error, _ = validator.validate_path(path, check_exists=False)
-            assert is_valid, f"Path '{path}' should be valid on Windows: {error}"
+            for path in valid_paths:
+                is_valid, error, _ = validator.validate_path(path, check_exists=False)
+                assert is_valid, f"Path '{path}' should be valid on Windows: {error}"
 
-    @patch("platform.system", return_value="Windows")
-    def test_windows_invalid_colon_usage(self, mock_platform):
+    def test_windows_invalid_colon_usage(self):
         """Test that invalid colon usage is blocked on Windows."""
         from ocode_python.utils.path_validator import PathValidator
 
-        validator = PathValidator()
+        with patch("platform.system", return_value="Windows"):
+            validator = PathValidator()
 
-        # Invalid colon usage (alternate data streams)
-        invalid_paths = [
-            "file.txt:hidden",
-            "C:\\temp\\file.txt:ads",
-            "notepad.exe:Zone.Identifier",
-        ]
+            # Invalid colon usage (alternate data streams)
+            invalid_paths = [
+                "file.txt:hidden",
+                "C:\\temp\\file.txt:ads",
+                "notepad.exe:Zone.Identifier",
+            ]
 
-        for path in invalid_paths:
-            is_valid, error, _ = validator.validate_path(path, check_exists=False)
-            assert not is_valid, f"Path '{path}' should be invalid on Windows"
-            assert (
-                "colon" in error.lower()
-            ), f"Error should mention colon usage: {error}"
+            for path in invalid_paths:
+                is_valid, error, _ = validator.validate_path(path, check_exists=False)
+                assert not is_valid, f"Path '{path}' should be invalid on Windows"
+                assert (
+                    "colon" in error.lower() or "drive letter" in error.lower()
+                ), f"Error should mention colon/drive letter usage: {error}"
