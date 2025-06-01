@@ -38,6 +38,7 @@ class GitStatusTool(Tool):
     async def execute(self, **kwargs: Any) -> ToolResult:
         """Get git status."""
         path = kwargs.get("path", ".")
+        repo = None
         try:
             repo = Repo(path, search_parent_directories=True)
 
@@ -89,6 +90,13 @@ class GitStatusTool(Tool):
             return ToolResult(
                 success=False, output="", error=f"Git status failed: {str(e)}"
             )
+        finally:
+            # Close the repository to release file handles
+            if repo is not None:
+                try:
+                    repo.close()
+                except Exception:  # nosec B110
+                    pass  # Ignore errors during cleanup
 
 
 class GitCommitTool(Tool):
@@ -133,6 +141,7 @@ class GitCommitTool(Tool):
         path = kwargs.get("path", ".")
         message = kwargs.get("message")
         files = kwargs.get("files")
+        repo = None
         try:
             repo = Repo(path, search_parent_directories=True)
 
@@ -183,6 +192,13 @@ class GitCommitTool(Tool):
             return ToolResult(
                 success=False, output="", error=f"Git commit failed: {str(e)}"
             )
+        finally:
+            # Close the repository to release file handles
+            if repo is not None:
+                try:
+                    repo.close()
+                except Exception:  # nosec B110
+                    pass  # Ignore errors during cleanup
 
 
 class GitDiffTool(Tool):
@@ -235,6 +251,7 @@ class GitDiffTool(Tool):
         staged = kwargs.get("staged", False)
         commit = kwargs.get("commit")
         file = kwargs.get("file")
+        repo = None
         try:
             repo = Repo(path, search_parent_directories=True)
 
@@ -307,6 +324,13 @@ class GitDiffTool(Tool):
             return ToolResult(
                 success=False, output="", error=f"Git diff failed: {str(e)}"
             )
+        finally:
+            # Close the repository to release file handles
+            if repo is not None:
+                try:
+                    repo.close()
+                except Exception:  # nosec B110
+                    pass  # Ignore errors during cleanup
 
 
 class GitBranchTool(Tool):

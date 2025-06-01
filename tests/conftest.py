@@ -232,10 +232,8 @@ def tool_registry():
 @pytest.fixture
 def context_manager(mock_project_dir: Path):
     """Create a test context manager."""
-    manager = ContextManager(mock_project_dir)
-    yield manager
-    # Ensure all SQLite connections are closed for Windows compatibility
-    manager.close_all_connections()
+    with ContextManager(mock_project_dir) as manager:
+        yield manager
 
 
 @pytest.fixture
@@ -300,7 +298,9 @@ def broken_function(
 @pytest.fixture
 def mock_git_repo(mock_project_dir: Path):
     """Create a mock git repository."""
+    import platform
     import subprocess
+    import time
 
     # Initialize git repo
     subprocess.run(["git", "init"], cwd=mock_project_dir, check=True)
@@ -317,7 +317,16 @@ def mock_git_repo(mock_project_dir: Path):
         ["git", "commit", "-m", "Initial commit"], cwd=mock_project_dir, check=True
     )
 
-    return mock_project_dir
+    yield mock_project_dir
+
+    # Windows-specific cleanup to release Git file handles
+    if platform.system() == "Windows":
+        # Force Git to release file handles
+        try:
+            subprocess.run(["git", "gc"], cwd=mock_project_dir, check=False)
+            time.sleep(0.2)  # Give Windows time to release file handles
+        except Exception:
+            pass
 
 
 @pytest.fixture

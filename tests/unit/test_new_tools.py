@@ -216,15 +216,31 @@ class TestBashTool:
     @pytest.mark.asyncio
     async def test_script_tool(self):
         import platform
+        import shutil
 
         tool = ScriptTool()
 
+        # Check if bash is available on Windows
+        if platform.system() == "Windows":
+            bash_available = shutil.which("bash") or shutil.which("git-bash")
+            if not bash_available:
+                # Test should expect failure with clear error message
+                script = """
+                echo Line 1
+                echo Line 2
+                """
+                result = await tool.execute(script=script)
+                assert not result.success
+                assert "Bash is not available" in result.error
+                assert "Git for Windows" in result.error
+                return
+
         # Use platform-appropriate script
         if platform.system() == "Windows":
-            # Windows script without quotes
+            # Windows script (bash available)
             script = """
-            echo Line 1
-            echo Line 2
+            echo "Line 1"
+            echo "Line 2"
             """
         else:
             # Unix script with quotes
