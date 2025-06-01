@@ -12,14 +12,15 @@ class CommandSanitizer:
 
     def __init__(self):
         """Initialize sanitizer with dangerous patterns."""
-        # Patterns that should never be allowed
-        self.forbidden_patterns = [
+        import platform
+
+        # Patterns that should never be allowed - Unix patterns
+        unix_patterns = [
             # System destruction
             r"\brm\s+-rf\s+/(?:\s|$)",
             r"\bsudo\s+rm\s+-rf",  # sudo rm -rf
             r"\bdd\s+.*of=/dev/[sh]d[a-z]",
             r"\bmkfs\.",
-            r"\bformat\s+[cC]:",
             r"\bfdisk\s+/dev/",
             # Fork bombs and resource exhaustion
             r":\(\)\s*\{.*:\|:&\s*\}",  # Classic fork bomb
@@ -43,6 +44,41 @@ class CommandSanitizer:
             r"echo.*>/sys/",
             r"echo.*>/proc/sys/",
         ]
+
+        # Windows-specific dangerous patterns
+        windows_patterns = [
+            # System destruction
+            r"\bformat\s+[cC]:",
+            r"\bdel\s+/[sS]\s+[cC]:\\\\",
+            r"\brd\s+/[sS]\s+[cC]:\\\\",
+            r"\brmdir\s+/[sS]\s+[cC]:\\\\",
+            r"\bbcdedit\s",
+            r"\bdiskpart\s",
+            # Registry manipulation
+            r"\breg\s+delete.*HKLM",
+            r"\breg\s+delete.*HKEY_LOCAL_MACHINE",
+            r"\bregsvr32\s+/u\s+/s",
+            # Service manipulation
+            r"\bsc\s+delete\s",
+            r"\bnet\s+stop\s+.*critical",
+            # Process termination
+            r"\btaskkill\s+/[fF]\s+/[iI][mM]\s+.*\.exe",
+            r"\btaskkill\s+/[fF]\s+/[tT]",
+            # PowerShell dangerous commands
+            r"Remove-Item.*-[rR]ecurse.*[cC]:\\\\",
+            r"Get-WmiObject.*Win32_OperatingSystem.*Reboot",
+            r"Stop-Computer\s+-Force",
+            r"Restart-Computer\s+-Force",
+            # Command substitution
+            r"`.*del\s+/[sS]",
+            r"\$\(.*Remove-Item.*-[rR]ecurse",
+        ]
+
+        # Combine patterns based on platform
+        if platform.system() == "Windows":
+            self.forbidden_patterns = unix_patterns + windows_patterns
+        else:
+            self.forbidden_patterns = unix_patterns
 
         # Commands that need careful validation
         self.restricted_commands = {

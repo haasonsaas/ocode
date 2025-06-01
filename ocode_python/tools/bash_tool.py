@@ -60,11 +60,28 @@ class ProcessManager:
                     await asyncio.wait_for(process.wait(), timeout=2.0)
                 except asyncio.TimeoutError:
                     # Process is really stuck, try OS-level kill
-                    if hasattr(os, "killpg") and process.pid:
-                        try:
-                            os.killpg(os.getpgid(process.pid), signal.SIGKILL)
-                        except (OSError, ProcessLookupError):
-                            pass
+                    import platform
+
+                    if platform.system() == "Windows":
+                        # Windows-specific process termination
+                        if process.pid:
+                            try:
+                                import subprocess  # nosec B404
+
+                                subprocess.run(  # nosec B603 B607
+                                    ["taskkill", "/F", "/T", "/PID", str(process.pid)],
+                                    check=False,
+                                    capture_output=True,
+                                )
+                            except (OSError, subprocess.SubprocessError):
+                                pass
+                    else:
+                        # Unix-specific process group kill
+                        if hasattr(os, "killpg") and process.pid:
+                            try:
+                                os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+                            except (OSError, ProcessLookupError):
+                                pass
         except (ProcessLookupError, OSError):
             # Process already dead
             pass
@@ -301,25 +318,45 @@ class BashTool(Tool):
 
     def _prepare_shell_command(self, command: str, shell: str) -> List[str]:
         """Prepare shell command for execution with proper sanitization."""
+        import platform
+        import shutil
+
+        # Windows-specific handling
+        if platform.system() == "Windows":
+            # On Windows, use cmd.exe or PowerShell
+            if shell in ["powershell", "pwsh"]:
+                # Use PowerShell if requested and available
+                powershell_path = shutil.which("pwsh") or shutil.which("powershell")
+                if powershell_path:
+                    return [powershell_path, "-Command", command]
+
+            # Default to cmd.exe on Windows
+            cmd_path = shutil.which("cmd") or "cmd.exe"
+            return [cmd_path, "/c", command]
+
+        # Unix-like systems
         shell_map = {
-            "bash": "/bin/bash",
-            "sh": "/bin/sh",
-            "zsh": "/bin/zsh",
-            "fish": "/usr/bin/fish",
+            "bash": "bash",
+            "sh": "sh",
+            "zsh": "zsh",
+            "fish": "fish",
         }
 
         # Validate shell parameter
         if shell not in shell_map:
             shell = "bash"  # Default to bash
 
-        shell_path = shell_map[shell]
+        shell_name = shell_map[shell]
 
-        # Check if shell exists, fallback to available shells
-        fallback_shells = ["/bin/bash", "/bin/sh", "/usr/bin/bash", "/usr/bin/sh"]
-        if not Path(shell_path).exists():
+        # Use shutil.which to find the shell executable
+        shell_path = shutil.which(shell_name)
+
+        if not shell_path:
+            # Fallback shells in order of preference
+            fallback_shells = ["bash", "sh", "zsh", "fish"]
             for fallback in fallback_shells:
-                if Path(fallback).exists():
-                    shell_path = fallback
+                shell_path = shutil.which(fallback)
+                if shell_path:
                     break
             else:
                 # Last resort: use 'sh' command
@@ -347,7 +384,9 @@ class BashTool(Tool):
             }
 
             # Set up process group for better cleanup on Unix
-            if hasattr(os, "setsid"):
+            import platform
+
+            if platform.system() != "Windows" and hasattr(os, "setsid"):
                 kwargs["start_new_session"] = True  # More portable than preexec_fn
 
             if capture_output:
@@ -737,29 +776,55 @@ class ScriptTool(Tool):
                 dir=tempfile.gettempdir(),  # Use system temp dir
             ) as script_file:
 
-                # Add shebang if needed
-                if script_type == "bash":
-                    script_file.write("#!/bin/bash\nset -e\n\n")
-                elif script_type == "python":
-                    script_file.write("#!/usr/bin/env python3\n\n")
-                elif script_type in ["node", "javascript"]:
-                    script_file.write("#!/usr/bin/env node\n\n")
+                # Add shebang if needed (Unix only)
+                import platform
+
+                if platform.system() != "Windows":
+                    if script_type == "bash":
+                        script_file.write("#!/bin/bash\nset -e\n\n")
+                    elif script_type == "python":
+                        script_file.write("#!/usr/bin/env python3\n\n")
+                    elif script_type in ["node", "javascript"]:
+                        script_file.write("#!/usr/bin/env node\n\n")
 
                 script_file.write(script_content)
                 script_file.flush()
 
-                # Make script executable
-                os.chmod(script_file.name, 0o700)  # User read/write/execute only
+                # Make script executable (Unix only)
+                if platform.system() != "Windows":
+                    os.chmod(script_file.name, 0o700)  # User read/write/execute only
 
                 # Prepare execution command
+                import shutil
+
                 if script_type == "bash":
-                    cmd = ["bash", script_file.name]
+                    if platform.system() == "Windows":
+                        # Use cmd or find bash on Windows
+                        bash_path = shutil.which("bash") or shutil.which("git-bash")
+                        if bash_path:
+                            cmd = [bash_path, script_file.name]
+                        else:
+                            # Fallback to cmd reading the script
+                            cmd = [
+                                shutil.which("cmd") or "cmd.exe",
+                                "/c",
+                                f"type {script_file.name} | cmd",
+                            ]
+                    else:
+                        cmd = [shutil.which("bash") or "bash", script_file.name]
                 elif script_type == "python":
-                    cmd = ["python3", script_file.name]
+                    python_cmd = (
+                        shutil.which("python3") or shutil.which("python") or "python"
+                    )
+                    cmd = [python_cmd, script_file.name]
                 elif script_type in ["node", "javascript"]:
-                    cmd = ["node", script_file.name]
+                    node_cmd = shutil.which("node") or "node"
+                    cmd = [node_cmd, script_file.name]
                 else:
-                    cmd = ["sh", script_file.name]
+                    if platform.system() == "Windows":
+                        cmd = [shutil.which("cmd") or "cmd.exe", "/c", script_file.name]
+                    else:
+                        cmd = [shutil.which("sh") or "sh", script_file.name]
 
                 # Execute script using BashTool
                 bash_tool = BashTool()

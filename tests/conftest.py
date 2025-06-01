@@ -4,6 +4,7 @@ Pytest configuration and fixtures for OCode tests.
 
 import asyncio
 import os
+import shutil
 import tempfile
 from pathlib import Path
 from typing import AsyncGenerator, Generator
@@ -377,11 +378,11 @@ async def async_test_helper(coro):
 
 # Skip markers for optional dependencies
 pytest.mark.requires_git = pytest.mark.skipif(
-    not Path("/usr/bin/git").exists() and not Path("/usr/local/bin/git").exists(),
+    shutil.which("git") is None,
     reason="Git not available",
 )
 
 pytest.mark.requires_docker = pytest.mark.skipif(
-    not Path("/usr/bin/docker").exists() and not Path("/usr/local/bin/docker").exists(),
+    shutil.which("docker") is None,
     reason="Docker not available",
 )
