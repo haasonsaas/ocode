@@ -1,14 +1,15 @@
 """Unit tests for Windows compatibility features."""
 
 import asyncio
-import platform
-from pathlib import Path
+import shutil
+import signal
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from ocode_python.tools.bash_tool import BashTool
+from ocode_python.tools.bash_tool import BashTool, _process_manager
 from ocode_python.utils.command_sanitizer import CommandSanitizer
+from ocode_python.utils.path_validator import PathValidator
 
 
 class TestWindowsCompatibility:
@@ -19,13 +20,13 @@ class TestWindowsCompatibility:
     @patch("shutil.which")
     async def test_bash_tool_windows_shell_preparation(self, mock_which, mock_platform):
         """Test Windows shell command preparation."""
-        mock_which.side_effect = lambda cmd: {
+        mock_which.side_effect = {
             "cmd": "C:\\Windows\\System32\\cmd.exe",
             "powershell": (
                 "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
             ),
             "pwsh": None,
-        }.get(cmd)
+        }.get
 
         bash_tool = BashTool()
 
@@ -88,12 +89,7 @@ class TestWindowsCompatibility:
         )
 
     @pytest.mark.asyncio
-    @patch("platform.system", return_value="Linux")
-    @patch("os.killpg")
-    @patch("os.getpgid")
-    async def test_unix_process_termination(
-        self, mock_getpgid, mock_killpg, mock_platform
-    ):
+    async def test_unix_process_termination(self):
         """Test Unix-specific process termination for comparison."""
         # Skip this test on actual Windows systems since Unix functions don't exist
         import platform
@@ -105,24 +101,26 @@ class TestWindowsCompatibility:
         if not hasattr(__import__("os"), "getpgid"):
             pytest.skip("os.getpgid not available on this platform")
 
-        import signal
+        # Only run this test on actual Unix systems where os.killpg exists
+        if not hasattr(__import__("os"), "killpg"):
+            pytest.skip("os.killpg not available on this platform")
 
-        from ocode_python.tools.bash_tool import _process_manager
+        with patch("platform.system", return_value="Linux"), patch(
+            "os.killpg"
+        ) as mock_killpg, patch("os.getpgid", return_value=1234):
 
-        mock_getpgid.return_value = 1234
+            # Mock process that needs termination
+            mock_process = AsyncMock()
+            mock_process.pid = 1234
+            mock_process.returncode = None  # Process still running
+            mock_process.terminate.return_value = None
+            mock_process.wait.side_effect = asyncio.TimeoutError()
+            mock_process.kill.return_value = None
 
-        # Mock process that needs termination
-        mock_process = AsyncMock()
-        mock_process.pid = 1234
-        mock_process.returncode = None  # Process still running
-        mock_process.terminate.return_value = None
-        mock_process.wait.side_effect = asyncio.TimeoutError()
-        mock_process.kill.return_value = None
+            # Test that os.killpg is called on Unix
+            await _process_manager._terminate_process(mock_process)
 
-        # Test that os.killpg is called on Unix
-        await _process_manager._terminate_process(mock_process)
-
-        mock_killpg.assert_called_with(1234, signal.SIGKILL)
+            mock_killpg.assert_called_with(1234, signal.SIGKILL)
 
     def test_command_sanitizer_windows_patterns(self):
         """Test Windows dangerous command detection."""
@@ -141,7 +139,7 @@ class TestWindowsCompatibility:
             ]
 
             for cmd in dangerous_commands:
-                is_safe, cleaned, reason = sanitizer.sanitize_command(cmd)
+                is_safe, _, reason = sanitizer.sanitize_command(cmd)
                 assert not is_safe, f"Command '{cmd}' should be blocked on Windows"
                 assert reason, f"Should provide reason for blocking '{cmd}'"
 
@@ -205,8 +203,6 @@ class TestCrossPlatformDetection:
     @patch("shutil.which")
     def test_git_detection(self, mock_which):
         """Test Git executable detection."""
-        import shutil
-
         # Test when Git is available
         mock_which.return_value = "/usr/bin/git"
         assert shutil.which("git") is not None
@@ -218,7 +214,6 @@ class TestCrossPlatformDetection:
     @patch("shutil.which")
     def test_docker_detection(self, mock_which):
         """Test Docker executable detection."""
-        import shutil
 
         # Test when Docker is available
         mock_which.return_value = "/usr/bin/docker"
@@ -234,8 +229,6 @@ class TestWindowsPathValidation:
 
     def test_windows_drive_letter_paths(self):
         """Test that Windows drive letter paths are allowed."""
-        from ocode_python.utils.path_validator import PathValidator
-
         with patch("platform.system", return_value="Windows"):
             validator = PathValidator()
 
@@ -254,7 +247,6 @@ class TestWindowsPathValidation:
 
     def test_windows_colon_validation_logic(self):
         """Test that Windows colon validation logic is implemented."""
-        from ocode_python.utils.path_validator import PathValidator
 
         # Just verify that the Windows-specific logic exists in the code
         # The platform detection happens at instantiation, so mocking doesn't work
@@ -268,5 +260,5 @@ class TestWindowsPathValidation:
         ), "PathValidator should have validate_path method"
 
         # Test that validation works for basic cases
-        is_valid, error, _ = validator.validate_path("test.txt", check_exists=False)
+        is_valid, _, _ = validator.validate_path("test.txt", check_exists=False)
         assert is_valid, "Simple filename should be valid"

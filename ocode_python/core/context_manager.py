@@ -233,6 +233,9 @@ class ContextManager:
         except OSError as e:
             raise RuntimeError(f"Failed to create cache directory: {e}")
 
+        # Track active connections for proper cleanup
+        self._active_connections: set = set()
+
         # In-memory caches with size limits for performance optimization
         # These provide fast access to recently analyzed files while preventing
         # unbounded memory growth through LRU eviction
@@ -305,7 +308,9 @@ class ContextManager:
             Creates SQLite database file at self.db_path if it doesn't exist.
             Existing databases are preserved and schema is updated if needed.
         """
-        with sqlite3.connect(self.db_path) as conn:
+        conn = sqlite3.connect(self.db_path)
+        try:
+            self._active_connections.add(conn)
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS file_analysis (
@@ -330,6 +335,10 @@ class ContextManager:
                 )
             """
             )
+            conn.commit()
+        finally:
+            self._active_connections.discard(conn)
+            conn.close()
 
     def _init_git(self) -> None:
         """Initialize Git repository connection if available.
@@ -750,7 +759,9 @@ class ContextManager:
             modified_time, language, symbols, imports, and created_at.
         """
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            conn = sqlite3.connect(self.db_path)
+            try:
+                self._active_connections.add(conn)
                 cursor = conn.cursor()
                 cursor.execute(
                     "SELECT * FROM file_analysis WHERE path = ? AND modified_time = ?",
@@ -768,6 +779,9 @@ class ContextManager:
                         imports=row[5].split(",") if row[5] else [],
                         size=0,  # We don't cache size
                     )
+            finally:
+                self._active_connections.discard(conn)
+                conn.close()
         except sqlite3.Error:
             # Database error - continue without cache
             pass
@@ -801,7 +815,9 @@ class ContextManager:
             is WAL mode by default for better concurrency.
         """
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            conn = sqlite3.connect(self.db_path)
+            try:
+                self._active_connections.add(conn)
                 conn.execute(
                     """INSERT OR REPLACE INTO file_analysis
                        (path, content_hash, modified_time, language, symbols, imports, created_at)  # noqa: E501
@@ -816,6 +832,10 @@ class ContextManager:
                         time.time(),
                     ),
                 )
+                conn.commit()
+            finally:
+                self._active_connections.discard(conn)
+                conn.close()
         except sqlite3.Error:
             # Database error - continue without persistent cache
             pass
@@ -1872,6 +1892,56 @@ class ContextManager:
         context.file_info = filtered_info
 
         return context
+
+    def close_all_connections(self) -> None:
+        """Close all active SQLite connections.
+
+        This method ensures that all SQLite database connections are properly
+        closed to prevent file locking issues, especially on Windows systems.
+        It should be called during cleanup or when the ContextManager is no
+        longer needed.
+
+        Side Effects:
+            Closes all connections tracked in self._active_connections.
+            Clears the connections set after closing.
+        """
+        import platform
+
+        connections_to_close = list(self._active_connections)
+        for conn in connections_to_close:
+            try:
+                conn.close()
+            except Exception:  # nosec B110
+                # Ignore errors during cleanup
+                pass
+        self._active_connections.clear()
+
+        # On Windows, add a small delay to ensure file handles are released
+        if platform.system() == "Windows" and connections_to_close:
+            import time
+
+            time.sleep(0.1)
+
+    def __del__(self) -> None:
+        """Destructor to ensure database connections are closed.
+
+        Automatically called when the ContextManager object is garbage collected.
+        This provides a safety net to ensure SQLite connections are closed even
+        if explicit cleanup is not performed.
+        """
+        try:
+            self.close_all_connections()
+        except Exception:  # nosec B110
+            # Ignore errors during destructor
+            pass
+
+    def __enter__(self):
+        """Context manager entry."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit - ensure connections are closed."""
+        self.close_all_connections()
 
 
 async def main() -> None:

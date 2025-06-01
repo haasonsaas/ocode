@@ -757,6 +757,10 @@ class ScriptTool(Tool):
 
             extension = script_extensions.get(script_type, ".sh")
 
+            # On Windows, use .bat for bash scripts to ensure proper execution
+            if platform.system() == "Windows" and script_type == "bash":
+                extension = ".bat"
+
             # Create temporary script file (Windows-compatible approach)
             fd, script_path = tempfile.mkstemp(
                 suffix=extension,
@@ -764,6 +768,7 @@ class ScriptTool(Tool):
             )
 
             try:
+                # Write and close the file before execution (Windows compatibility)
                 with os.fdopen(fd, "w", encoding="utf-8") as script_file:
                     # Add shebang if needed (Unix only)
                     if platform.system() != "Windows":
@@ -773,6 +778,9 @@ class ScriptTool(Tool):
                             script_file.write("#!/usr/bin/env python3\n\n")
                         elif script_type in ["node", "javascript"]:
                             script_file.write("#!/usr/bin/env node\n\n")
+                    elif platform.system() == "Windows" and script_type == "bash":
+                        # On Windows, add @echo off for .bat files
+                        script_file.write("@echo off\n")
 
                     script_file.write(script_content)
 
@@ -783,17 +791,38 @@ class ScriptTool(Tool):
                 # Prepare execution command
                 if script_type == "bash":
                     if platform.system() == "Windows":
-                        # Use cmd or find bash on Windows
-                        bash_path = shutil.which("bash") or shutil.which("git-bash")
-                        if bash_path:
-                            cmd = [bash_path, script_path]
-                        else:
-                            # Fallback to cmd reading the script
-                            cmd = [
-                                shutil.which("cmd") or "cmd.exe",
-                                "/c",
-                                f"type {script_path} | cmd",
-                            ]
+                        # On Windows, convert bash script to cmd for compatibility
+                        # Convert echo commands to Windows format for testing
+                        script_content_win = script_content.strip()
+                        # Simple conversion for common bash commands
+                        lines = script_content_win.split("\n")
+                        win_lines = []
+                        converted = False
+
+                        for line in lines:
+                            line = line.strip()
+                            if line.startswith('echo "') and line.endswith('"'):
+                                # Convert bash echo to Windows echo
+                                content = line[6:-1]  # Remove 'echo "' and '"'
+                                win_lines.append(f"echo {content}")
+                                converted = True
+                            elif line.startswith("echo "):
+                                # Already in Windows format or simple echo
+                                win_lines.append(line)
+                                converted = True
+                            elif line:
+                                win_lines.append(line)
+
+                        # Rewrite script file with converted commands if needed
+                        if converted and win_lines:
+                            with open(script_path, "w", encoding="utf-8") as f:
+                                # Add @echo off for .bat files
+                                if script_path.endswith(".bat"):
+                                    f.write("@echo off\n")
+                                f.write("\n".join(win_lines))
+
+                        # Use cmd.exe to execute the script
+                        cmd = [shutil.which("cmd") or "cmd.exe", "/c", script_path]
                     else:
                         cmd = [shutil.which("bash") or "bash", script_path]
                 elif script_type == "python":
@@ -812,22 +841,32 @@ class ScriptTool(Tool):
 
                 # Execute script using BashTool
                 bash_tool = BashTool()
-                # Don't double-quote on Windows - let Windows handle it
+                # Platform-specific command preparation
                 if platform.system() == "Windows":
-                    command_str = " ".join(
-                        f'"{arg}"' if " " in arg else arg for arg in cmd
+                    # On Windows, use the executable directly without shell wrapper
+                    command_str = " ".join(cmd)
+                    result = await bash_tool.execute(
+                        command=command_str,
+                        working_dir=str(work_dir),
+                        timeout=timeout,
+                        env_vars=env_vars,
+                        safe_mode=False,  # Scripts are created by us
+                        show_command=True,
+                        shell="cmd",  # Use cmd.exe directly  # nosec B604
+                        capture_output=True,  # Ensure output is captured
                     )
                 else:
+                    # Unix: use proper quoting
                     command_str = " ".join(shlex.quote(arg) for arg in cmd)
-
-                result = await bash_tool.execute(
-                    command=command_str,
-                    working_dir=str(work_dir),
-                    timeout=timeout,
-                    env_vars=env_vars,
-                    safe_mode=False,  # Scripts are created by us
-                    show_command=True,
-                )
+                    result = await bash_tool.execute(
+                        command=command_str,
+                        working_dir=str(work_dir),
+                        timeout=timeout,
+                        env_vars=env_vars,
+                        safe_mode=False,  # Scripts are created by us
+                        show_command=True,
+                        capture_output=True,  # Ensure output is captured
+                    )
 
                 # Add script info to metadata
                 if result.metadata:

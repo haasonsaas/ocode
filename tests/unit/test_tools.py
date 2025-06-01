@@ -435,8 +435,8 @@ class TestShellTools:
 
         # Use platform-appropriate long-running command
         if platform.system() == "Windows":
-            # Windows timeout command
-            command = "timeout /t 10 /nobreak"
+            # Windows: Use ping to localhost as a delay mechanism (no redirection)
+            command = "ping -n 11 127.0.0.1"
         else:
             # Unix sleep command
             command = 'python -c "import time; time.sleep(10)"'

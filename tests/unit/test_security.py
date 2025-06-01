@@ -360,8 +360,8 @@ class TestSecureShellExecutor:
 
         # Use platform-appropriate sleep command
         if platform.system() == "Windows":
-            # Windows timeout command (in seconds)
-            cmd = "timeout /t 10 /nobreak"
+            # Windows: Use ping to localhost as a delay mechanism (no redirection)
+            cmd = "ping -n 11 127.0.0.1"
         else:
             # Unix sleep command
             cmd = "sleep 10"

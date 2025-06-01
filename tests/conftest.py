@@ -232,7 +232,10 @@ def tool_registry():
 @pytest.fixture
 def context_manager(mock_project_dir: Path):
     """Create a test context manager."""
-    return ContextManager(mock_project_dir)
+    manager = ContextManager(mock_project_dir)
+    yield manager
+    # Ensure all SQLite connections are closed for Windows compatibility
+    manager.close_all_connections()
 
 
 @pytest.fixture
@@ -249,7 +252,10 @@ def ocode_engine(mock_project_dir: Path, mock_ollama_client, mock_config: dict):
     engine.api_client = mock_ollama_client
     engine.config._config_cache = mock_config
 
-    return engine
+    yield engine
+    # Ensure all SQLite connections are closed for Windows compatibility
+    if hasattr(engine, "context_manager"):
+        engine.context_manager.close_all_connections()
 
 
 @pytest.fixture

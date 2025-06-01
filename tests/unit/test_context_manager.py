@@ -17,79 +17,74 @@ class TestContextManager:
 
     def test_init_with_default_root(self):
         """Test initialization with default root."""
-        manager = ContextManager()
-        assert manager.root == Path.cwd()
+        with ContextManager() as manager:
+            assert manager.root == Path.cwd()
 
     def test_init_with_custom_root(self, temp_dir: Path):
         """Test initialization with custom root."""
-        manager = ContextManager(temp_dir)
-        assert manager.root == temp_dir
+        with ContextManager(temp_dir) as manager:
+            assert manager.root == temp_dir
 
     def test_should_ignore_file(self, temp_dir: Path):
         """Test file ignore logic."""
-        manager = ContextManager(temp_dir)
+        with ContextManager(temp_dir) as manager:
+            # Should ignore
+            assert manager._should_ignore(temp_dir / ".git" / "config")
+            assert manager._should_ignore(temp_dir / "__pycache__" / "file.pyc")
+            assert manager._should_ignore(temp_dir / "file.pyc")
+            assert manager._should_ignore(temp_dir / ".DS_Store")
 
-        # Should ignore
-        assert manager._should_ignore(temp_dir / ".git" / "config")
-        assert manager._should_ignore(temp_dir / "__pycache__" / "file.pyc")
-        assert manager._should_ignore(temp_dir / "file.pyc")
-        assert manager._should_ignore(temp_dir / ".DS_Store")
-
-        # Should not ignore
-        assert not manager._should_ignore(temp_dir / "main.py")
-        assert not manager._should_ignore(temp_dir / "src" / "utils.py")
+            # Should not ignore
+            assert not manager._should_ignore(temp_dir / "main.py")
+            assert not manager._should_ignore(temp_dir / "src" / "utils.py")
 
     def test_should_ignore_large_file(self, temp_dir: Path):
         """Test ignoring large files."""
-        manager = ContextManager(temp_dir)
+        with ContextManager(temp_dir) as manager:
+            # Create large file
+            large_file = temp_dir / "large.txt"
+            with open(large_file, "w") as f:
+                # Write > 1MB of data
+                f.write("x" * (1024 * 1024 + 1))
 
-        # Create large file
-        large_file = temp_dir / "large.txt"
-        with open(large_file, "w") as f:
-            # Write > 1MB of data
-            f.write("x" * (1024 * 1024 + 1))
-
-        assert manager._should_ignore(large_file)
+            assert manager._should_ignore(large_file)
 
     def test_get_content_hash(self):
         """Test content hashing."""
-        manager = ContextManager()
+        with ContextManager() as manager:
+            content1 = "Hello, world!"
+            content2 = "Hello, world!"
+            content3 = "Different content"
 
-        content1 = "Hello, world!"
-        content2 = "Hello, world!"
-        content3 = "Different content"
+            hash1 = manager._get_content_hash(content1)
+            hash2 = manager._get_content_hash(content2)
+            hash3 = manager._get_content_hash(content3)
 
-        hash1 = manager._get_content_hash(content1)
-        hash2 = manager._get_content_hash(content2)
-        hash3 = manager._get_content_hash(content3)
-
-        assert hash1 == hash2
-        assert hash1 != hash3
+            assert hash1 == hash2
+            assert hash1 != hash3
 
     def test_detect_language(self):
         """Test language detection."""
-        manager = ContextManager()
+        with ContextManager() as manager:
+            test_cases = [
+                (Path("script.py"), "python"),
+                (Path("app.js"), "typescript"),  # TypeScript analyzer handles .js files
+                (Path("app.ts"), "typescript"),
+                (Path("README.md"), "markdown"),
+                (Path("config.yaml"), "yaml"),
+                (Path("main.tf"), "terraform"),
+                (Path("unknown.xyz"), None),
+                (Path("main.go"), None),  # No Go analyzer yet
+                (Path("style.css"), None),  # No CSS analyzer yet
+            ]
 
-        test_cases = [
-            (Path("script.py"), "python"),
-            (Path("app.js"), "typescript"),  # TypeScript analyzer handles .js files
-            (Path("app.ts"), "typescript"),
-            (Path("README.md"), "markdown"),
-            (Path("config.yaml"), "yaml"),
-            (Path("main.tf"), "terraform"),
-            (Path("unknown.xyz"), None),
-            (Path("main.go"), None),  # No Go analyzer yet
-            (Path("style.css"), None),  # No CSS analyzer yet
-        ]
-
-        for file_path, expected in test_cases:
-            assert manager._detect_language(file_path) == expected
+            for file_path, expected in test_cases:
+                assert manager._detect_language(file_path) == expected
 
     def test_extract_symbols_python(self):
         """Test Python symbol extraction."""
-        manager = ContextManager()
-
-        content = """
+        with ContextManager() as manager:
+            content = """
 def hello():
     pass
 
@@ -98,99 +93,92 @@ class MyClass:
         pass
 """
 
-        symbols = manager._extract_symbols(content, "python")
-        assert len(symbols) >= 2  # Should find function and class
+            symbols = manager._extract_symbols(content, "python")
+            assert len(symbols) >= 2  # Should find function and class
 
     def test_extract_imports_python(self):
         """Test Python import extraction."""
-        manager = ContextManager()
-
-        content = """
+        with ContextManager() as manager:
+            content = """
 import os
 from pathlib import Path
 import json as js
 """
 
-        imports = manager._extract_imports(content, "python")
-        assert len(imports) >= 3
+            imports = manager._extract_imports(content, "python")
+            assert len(imports) >= 3
 
     @pytest.mark.asyncio
     async def test_analyze_file_success(self, mock_project_dir: Path):
         """Test successful file analysis."""
-        manager = ContextManager(mock_project_dir)
+        with ContextManager(mock_project_dir) as manager:
+            file_path = mock_project_dir / "main.py"
+            file_info = await manager.analyze_file(file_path)
 
-        file_path = mock_project_dir / "main.py"
-        file_info = await manager.analyze_file(file_path)
-
-        assert file_info is not None
-        assert file_info.path == file_path
-        assert file_info.language == "python"
-        assert file_info.size > 0
-        assert len(file_info.symbols) > 0
+            assert file_info is not None
+            assert file_info.path == file_path
+            assert file_info.language == "python"
+            assert file_info.size > 0
+            assert len(file_info.symbols) > 0
 
     @pytest.mark.asyncio
     async def test_analyze_file_nonexistent(self, temp_dir: Path):
         """Test analyzing non-existent file."""
-        manager = ContextManager(temp_dir)
+        with ContextManager(temp_dir) as manager:
+            file_path = temp_dir / "nonexistent.py"
+            file_info = await manager.analyze_file(file_path)
 
-        file_path = temp_dir / "nonexistent.py"
-        file_info = await manager.analyze_file(file_path)
-
-        assert file_info is None
+            assert file_info is None
 
     @pytest.mark.asyncio
     async def test_analyze_file_ignored(self, temp_dir: Path):
         """Test analyzing ignored file."""
-        manager = ContextManager(temp_dir)
+        with ContextManager(temp_dir) as manager:
+            # Create ignored file
+            ignored_file = temp_dir / ".git" / "config"
+            ignored_file.parent.mkdir()
+            ignored_file.write_text("ignored content")
 
-        # Create ignored file
-        ignored_file = temp_dir / ".git" / "config"
-        ignored_file.parent.mkdir()
-        ignored_file.write_text("ignored content")
-
-        file_info = await manager.analyze_file(ignored_file)
-        assert file_info is None
+            file_info = await manager.analyze_file(ignored_file)
+            assert file_info is None
 
     @pytest.mark.asyncio
     async def test_scan_project(self, mock_project_dir: Path):
         """Test project scanning."""
-        manager = ContextManager(mock_project_dir)
+        with ContextManager(mock_project_dir) as manager:
+            files = await manager.scan_project()
 
-        files = await manager.scan_project()
+            # Should find Python files but not ignore patterns
+            python_files = [f for f in files if f.suffix == ".py"]
+            assert len(python_files) >= 3  # main.py, utils.py, test_utils.py
 
-        # Should find Python files but not ignore patterns
-        python_files = [f for f in files if f.suffix == ".py"]
-        assert len(python_files) >= 3  # main.py, utils.py, test_utils.py
-
-        # Should not find ignored files
-        git_files = [f for f in files if ".git" in str(f)]
-        assert len(git_files) == 0
+            # Should not find ignored files
+            git_files = [f for f in files if ".git" in str(f)]
+            assert len(git_files) == 0
 
     @pytest.mark.asyncio
     async def test_build_context(self, mock_project_dir: Path):
         """Test building project context."""
-        manager = ContextManager(mock_project_dir)
+        with ContextManager(mock_project_dir) as manager:
+            context = await manager.build_context("test query", max_files=10)
 
-        context = await manager.build_context("test query", max_files=10)
+            assert isinstance(context, ProjectContext)
+            assert context.project_root == mock_project_dir
+            assert len(context.files) > 0
+            assert len(context.file_info) > 0
 
-        assert isinstance(context, ProjectContext)
-        assert context.project_root == mock_project_dir
-        assert len(context.files) > 0
-        assert len(context.file_info) > 0
-
-        # Check if we have some symbols
-        assert len(context.symbols) > 0
+            # Check if we have some symbols
+            assert len(context.symbols) > 0
 
     @pytest.mark.asyncio
     async def test_build_context_with_git(self, mock_git_repo: Path):
         """Test building context with git information."""
-        manager = ContextManager(mock_git_repo)
+        with ContextManager(mock_git_repo) as manager:
+            context = await manager.build_context("test query")
 
-        context = await manager.build_context("test query")
-
-        assert context.git_info is not None
-        assert "branch" in context.git_info
-        assert "commit" in context.git_info
+            assert context.git_info is not None
+            assert "branch" in context.git_info
+            assert "commit" in context.git_info
 
     def test_get_relevant_files(self, mock_project_dir: Path):
         """Test relevant file selection."""
@@ -221,21 +209,20 @@ import json as js
     @pytest.mark.asyncio
     async def test_cache_analysis(self, temp_dir: Path):
         """Test caching of file analysis."""
-        manager = ContextManager(temp_dir)
+        with ContextManager(temp_dir) as manager:
+            # Create test file
+            test_file = temp_dir / "test.py"
+            test_file.write_text("def test(): pass")
 
-        # Create test file
-        test_file = temp_dir / "test.py"
-        test_file.write_text("def test(): pass")
+            # First analysis
+            file_info1 = await manager.analyze_file(test_file)
 
-        # First analysis
-        file_info1 = await manager.analyze_file(test_file)
+            # Second analysis should use cache (same mtime)
+            file_info2 = await manager.analyze_file(test_file)
 
-        # Second analysis should use cache (same mtime)
-        file_info2 = await manager.analyze_file(test_file)
-
-        assert file_info1 is not None
-        assert file_info2 is not None
-        assert file_info1.content_hash == file_info2.content_hash
+            assert file_info1 is not None
+            assert file_info2 is not None
+            assert file_info1.content_hash == file_info2.content_hash
 
 
 @pytest.mark.unit
