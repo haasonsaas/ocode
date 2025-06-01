@@ -286,7 +286,7 @@ class FileEditTool(Tool):
                 pattern = re.escape(search_pattern)
 
             if whole_word:
-                pattern = f"\\b{pattern}\\b"
+                pattern = rf"\b{pattern}\b"
 
             # Compile regex
             flags = 0 if case_sensitive else re.IGNORECASE
@@ -394,7 +394,7 @@ class FileEditTool(Tool):
                     pattern = re.escape(search_pattern)
 
                 if whole_word:
-                    pattern = f"\\b{pattern}\\b"
+                    pattern = rf"\b{pattern}\b"
 
                 flags = 0 if case_sensitive else re.IGNORECASE
                 compiled_pattern = re.compile(pattern, flags)

@@ -148,7 +148,7 @@ class GrepTool(Tool):
             regex_flags = 0 if case_sensitive else re.IGNORECASE
 
             if whole_word:
-                pattern = f"\\b{str(pattern)}\\b"
+                pattern = rf"\b{str(pattern)}\b"
 
             try:
                 compiled_pattern: Pattern[str] = re.compile(str(pattern), regex_flags)
@@ -722,55 +722,53 @@ class CodeGrepTool(GrepTool):
             # Create language-specific patterns
             if search_type == "function":
                 if language == "python":
-                    pattern = f"(?:def|async\\s+def)\\s+{pattern}\\s*\\("
+                    pattern = rf"(?:def|async\s+def)\s+{pattern}\s*\("
                 elif language in ["javascript", "typescript"]:
-                    pattern = f"(?:function\\s+{pattern}\\s*\\(|const\\s+{pattern}\\s*=\\s*(?:async\\s+)?(?:function|\\([^)]*\\)\\s*=>)|{pattern}\\s*:\\s*(?:async\\s+)?(?:function|\\([^)]*\\)\\s*=>))"  # noqa: E501
+                    pattern = rf"(?:function\s+{pattern}\s*\(|const\s+{pattern}\s*=\s*(?:async\s+)?(?:function|\([^)]*\)\s*=>)|{pattern}\s*:\s*(?:async\s+)?(?:function|\([^)]*\)\s*=>))"  # noqa: E501
                 elif language == "java":
-                    pattern = f"(?:public|private|protected|static|\\s)+\\w+\\s+{pattern}\\s*\\("  # noqa: E501
+                    pattern = rf"(?:public|private|protected|static|\s)+\w+\s+{pattern}\s*\("  # noqa: E501
                 elif language == "go":
-                    pattern = f"func\\s+(?:\\([^)]+\\)\\s+)?{pattern}\\s*\\("
+                    pattern = rf"func\s+(?:\([^)]+\)\s+)?{pattern}\s*\("
                 elif language == "rust":
-                    pattern = f"fn\\s+{pattern}\\s*[<(]"
+                    pattern = rf"fn\s+{pattern}\s*[<(]"
             elif search_type == "class":
                 if language == "python":
-                    pattern = f"class\\s+{pattern}\\s*[\\(:]"
+                    pattern = rf"class\s+{pattern}\s*[\(:]"
                 elif language in ["javascript", "typescript"]:
-                    pattern = f"class\\s+{pattern}\\s*(?:extends\\s+\\w+\\s*)?[{{\\s]"
+                    pattern = rf"class\s+{pattern}\s*(?:extends\s+\w+\s*)?[{{\s]"
                 elif language == "java":
-                    pattern = f"(?:public\\s+)?class\\s+{pattern}\\s*(?:extends\\s+\\w+\\s*)?(?:implements\\s+[\\w,\\s]+\\s*)?\\{{"  # noqa: E501
+                    pattern = rf"(?:public\s+)?class\s+{pattern}\s*(?:extends\s+\w+\s*)?(?:implements\s+[\w,\s]+\s*)?{{"  # noqa: E501
                 elif language == "go":
-                    pattern = f"type\\s+{pattern}\\s+struct\\s*\\{{"
+                    pattern = rf"type\s+{pattern}\s+struct\s*\{{"
                 elif language == "rust":
-                    pattern = f"(?:pub\\s+)?struct\\s+{pattern}\\s*[{{<]"
+                    pattern = rf"(?:pub\s+)?struct\s+{pattern}\s*[{{<]"
             elif search_type == "import":
                 if language == "python":
-                    pattern = f"(?:import\\s+{pattern}|from\\s+{pattern}\\s+import|from\\s+\\S+\\s+import.*{pattern})"  # noqa: E501
+                    pattern = rf"(?:import\s+{pattern}|from\s+{pattern}\s+import|from\s+\S+\s+import.*{pattern})"  # noqa: E501
                 elif language in ["javascript", "typescript"]:
-                    pattern = f"(?:import.*from\\s+['\"].*{pattern}.*['\"]|import\\s+.*{pattern}|require\\(['\"].*{pattern}.*['\"]\\))"  # noqa: E501
+                    pattern = rf"(?:import.*from\s+['\"].*{pattern}.*['\"]|import\s+.*{pattern}|require\(['\"].*{pattern}.*['\"]\\))"  # noqa: E501
                 elif language == "java":
-                    pattern = f"import\\s+(?:static\\s+)?.*{pattern}"
+                    pattern = rf"import\s+(?:static\s+)?.*{pattern}"
                 elif language == "go":
-                    pattern = (
-                        f"import\\s+(?:\\(.*{pattern}.*\\)|['\"].*{pattern}.*['\"])"
-                    )
+                    pattern = rf"import\s+(?:\(.*{pattern}.*\)|['\"].*{pattern}.*['\"])"
                 elif language == "rust":
-                    pattern = f"use\\s+.*{pattern}"
+                    pattern = rf"use\s+.*{pattern}"
             elif search_type == "variable":
                 if language == "python":
-                    pattern = f"(?:{pattern}\\s*=|self\\.{pattern}\\s*=)"
+                    pattern = rf"(?:{pattern}\s*=|self\.{pattern}\s*=)"
                 elif language in ["javascript", "typescript"]:
-                    pattern = f"(?:(?:let|const|var)\\s+{pattern}\\s*[=;]|this\\.{pattern}\\s*=)"  # noqa: E501
+                    pattern = rf"(?:(?:let|const|var)\s+{pattern}\s*[=;]|this\.{pattern}\s*=)"  # noqa: E501
                 elif language == "java":
-                    pattern = f"(?:(?:public|private|protected|static|final|\\s)+)?\\w+\\s+{pattern}\\s*[=;]"  # noqa: E501
+                    pattern = rf"(?:(?:public|private|protected|static|final|\s)+)?\w+\s+{pattern}\s*[=;]"  # noqa: E501
                 elif language == "go":
-                    pattern = f"(?:{pattern}\\s*:=|var\\s+{pattern}\\s+)"
+                    pattern = rf"(?:{pattern}\s*:=|var\s+{pattern}\s+)"
                 elif language == "rust":
-                    pattern = f"(?:let\\s+(?:mut\\s+)?{pattern}\\s*[=;])"
+                    pattern = rf"(?:let\s+(?:mut\s+)?{pattern}\s*[=;])"
             elif search_type == "comment":
                 if language == "python":
                     pattern = f"#.*{pattern}"
                 elif language in ["javascript", "typescript", "java", "go", "rust"]:
-                    pattern = f"(?://.*{pattern}|/\\*.*{pattern}.*\\*/)"
+                    pattern = rf"(?://.*{pattern}|/\*.*{pattern}.*\*/)"
             elif search_type == "string":
                 if language == "python":
                     pattern = f"(?:['\"].*{pattern}.*['\"]|['\"]['\"]['\"].*{pattern}.*['\"]['\"]['\"])"  # noqa: E501
@@ -1101,7 +1099,7 @@ class CodeGrepTool(GrepTool):
             regex_flags = 0 if case_sensitive else re.IGNORECASE
 
             if whole_word:
-                pattern = f"\\b{str(pattern)}\\b"
+                pattern = rf"\b{str(pattern)}\b"
 
             try:
                 compiled_pattern: Pattern[str] = re.compile(str(pattern), regex_flags)
