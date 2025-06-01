@@ -1,5 +1,5 @@
 """
-Advanced orchestration system with command queues, side-effect tracking, and retry logic.
+Advanced orchestration system with command queues, side-effect tracking, and retry.
 
 This module implements sophisticated orchestration patterns including:
 - Priority-based command queuing
@@ -10,21 +10,22 @@ This module implements sophisticated orchestration patterns including:
 """
 
 import asyncio
+import logging
 import time
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Tuple
 from pathlib import Path
-import logging
+from typing import Any, Dict, List, Optional, Set, Tuple
 
-from ..tools.base import Tool, ToolResult, ToolRegistry
+from ..tools.base import ToolRegistry, ToolResult
+
 # Timeout functionality is available from timeout_handler module
 
 
 class Priority(Enum):
     """Command execution priority levels."""
-    
+
     HIGH = "high"
     NORMAL = "normal"
     BACKGROUND = "background"
@@ -32,7 +33,7 @@ class Priority(Enum):
 
 class SideEffectType(Enum):
     """Types of side effects that tools can produce."""
-    
+
     FILE_READ = "file_read"
     FILE_WRITE = "file_write"
     FILE_DELETE = "file_delete"
@@ -45,7 +46,7 @@ class SideEffectType(Enum):
 @dataclass
 class SideEffect:
     """Represents a side effect from tool execution."""
-    
+
     effect_type: SideEffectType
     target: str  # File path, process name, URL, etc.
     operation: str  # Specific operation performed
@@ -58,7 +59,7 @@ class SideEffect:
 @dataclass
 class CommandTask:
     """Represents a command task in the queue."""
-    
+
     task_id: str
     tool_name: str
     arguments: Dict[str, Any]
@@ -75,12 +76,13 @@ class CommandTask:
 
 class TransientError(Exception):
     """Exception for temporary errors that should be retried."""
+
     pass
 
 
 class CommandQueue:
     """Priority-based command queue with dependency tracking."""
-    
+
     def __init__(self):
         self.high_priority = asyncio.Queue()
         self.normal_priority = asyncio.Queue()
@@ -88,19 +90,19 @@ class CommandQueue:
         self.tasks: Dict[str, CommandTask] = {}
         self.completed_tasks: Dict[str, CommandTask] = {}
         self._lock = asyncio.Lock()
-    
+
     async def enqueue(self, task: CommandTask) -> None:
         """Add a task to the appropriate priority queue."""
         async with self._lock:
             self.tasks[task.task_id] = task
-            
+
             if task.priority == Priority.HIGH:
                 await self.high_priority.put(task.task_id)
             elif task.priority == Priority.NORMAL:
                 await self.normal_priority.put(task.task_id)
             else:
                 await self.background.put(task.task_id)
-    
+
     async def dequeue(self) -> Optional[CommandTask]:
         """Get the next task to execute, respecting priority and dependencies."""
         async with self._lock:
@@ -110,7 +112,7 @@ class CommandQueue:
                     try:
                         task_id = queue.get_nowait()
                         task = self.tasks.get(task_id)
-                        
+
                         if task and self._are_dependencies_satisfied(task):
                             task.started_at = time.time()
                             return task
@@ -119,16 +121,13 @@ class CommandQueue:
                             await queue.put(task_id)
                     except asyncio.QueueEmpty:
                         continue
-        
+
         return None
-    
+
     def _are_dependencies_satisfied(self, task: CommandTask) -> bool:
         """Check if all task dependencies are completed."""
-        return all(
-            dep_id in self.completed_tasks 
-            for dep_id in task.dependencies
-        )
-    
+        return all(dep_id in self.completed_tasks for dep_id in task.dependencies)
+
     async def mark_completed(self, task_id: str, result: ToolResult) -> None:
         """Mark a task as completed."""
         async with self._lock:
@@ -141,21 +140,21 @@ class CommandQueue:
 
 class SideEffectBroker:
     """Tracks and manages side effects from tool execution."""
-    
+
     def __init__(self):
         self.effects: List[SideEffect] = []
         self.file_backups: Dict[str, bytes] = {}  # For rollback
         self._lock = asyncio.Lock()
-    
+
     async def record_effect(self, effect: SideEffect) -> None:
         """Record a side effect."""
         async with self._lock:
             self.effects.append(effect)
-            
+
             # Create backup for file operations
             if effect.effect_type == SideEffectType.FILE_WRITE:
                 await self._backup_file(effect.target)
-    
+
     async def _backup_file(self, file_path: str) -> None:
         """Create a backup of a file before modification."""
         try:
@@ -164,18 +163,20 @@ class SideEffectBroker:
                 self.file_backups[file_path] = path.read_bytes()
         except Exception as e:
             logging.warning(f"Failed to backup file {file_path}: {e}")
-    
+
     async def rollback_effects(self, task_id: str) -> None:
         """Rollback side effects for a specific task."""
         async with self._lock:
-            task_effects = [e for e in self.effects if e.metadata.get('task_id') == task_id]
-            
+            task_effects = [
+                e for e in self.effects if e.metadata.get("task_id") == task_id
+            ]
+
             for effect in reversed(task_effects):  # Rollback in reverse order
                 try:
                     await self._rollback_single_effect(effect)
                 except Exception as e:
                     logging.error(f"Failed to rollback effect {effect}: {e}")
-    
+
     async def _rollback_single_effect(self, effect: SideEffect) -> None:
         """Rollback a single side effect."""
         if effect.effect_type == SideEffectType.FILE_WRITE:
@@ -190,97 +191,92 @@ class SideEffectBroker:
 
 class RetryManager:
     """Manages retry logic with exponential backoff."""
-    
+
     def __init__(self, max_retries: int = 3, base_delay: float = 1.0):
         self.max_retries = max_retries
         self.base_delay = base_delay
-    
+
     async def execute_with_retry(
-        self, 
-        task: CommandTask, 
-        executor_func,
-        side_effect_broker: SideEffectBroker
+        self, task: CommandTask, executor_func, side_effect_broker: SideEffectBroker
     ) -> ToolResult:
         """Execute a task with retry logic."""
         last_error = None
-        
+
         for attempt in range(self.max_retries + 1):
             try:
                 result = await executor_func(task)
-                
+
                 if result.success:
                     return result
                 elif self._is_retryable_error(result.error):
                     last_error = result.error
                     if attempt < self.max_retries:
-                        delay = self.base_delay * (2 ** attempt)
+                        delay = self.base_delay * (2**attempt)
                         await asyncio.sleep(delay)
                         task.retry_count += 1
                         continue
-                
+
                 return result
-                
+
             except TransientError as e:
                 last_error = str(e)
                 if attempt < self.max_retries:
                     # Rollback any side effects from this attempt
                     await side_effect_broker.rollback_effects(task.task_id)
-                    
-                    delay = self.base_delay * (2 ** attempt)
+
+                    delay = self.base_delay * (2**attempt)
                     await asyncio.sleep(delay)
                     task.retry_count += 1
                     continue
-                    
+
             except Exception as e:
                 # Non-retryable error
                 return ToolResult(
-                    success=False,
-                    output="",
-                    error=f"Non-retryable error: {str(e)}"
+                    success=False, output="", error=f"Non-retryable error: {str(e)}"
                 )
-        
+
         return ToolResult(
             success=False,
             output="",
-            error=f"Max retries exceeded. Last error: {last_error}"
+            error=f"Max retries exceeded. Last error: {last_error}",
         )
-    
+
     def _is_retryable_error(self, error: Optional[str]) -> bool:
         """Determine if an error is retryable."""
         if not error:
             return False
-            
+
         retryable_patterns = [
             "timeout",
             "connection",
             "network",
             "temporary",
             "resource unavailable",
-            "try again"
+            "try again",
         ]
-        
+
         error_lower = error.lower()
         return any(pattern in error_lower for pattern in retryable_patterns)
 
 
 class ConcurrentToolExecutor:
     """Manages concurrent execution of independent tools."""
-    
+
     def __init__(self, max_concurrent: int = 5):
         self.max_concurrent = max_concurrent
         self.semaphore = asyncio.Semaphore(max_concurrent)
         self.active_tasks: Set[str] = set()
-    
+
     async def execute_parallel_tools(
-        self, 
+        self,
         tasks: List[CommandTask],
         tool_registry: ToolRegistry,
-        side_effect_broker: SideEffectBroker
+        side_effect_broker: SideEffectBroker,
     ) -> List[ToolResult]:
         """Execute independent tools in parallel."""
         # Identify truly independent tasks (no shared resources)
         independent_groups = self._group_independent_tasks(tasks)
-        
+
         results = []
         for group in independent_groups:
             if len(group) == 1:
@@ -295,18 +291,20 @@ class ConcurrentToolExecutor:
                     group, tool_registry, side_effect_broker
                 )
                 results.extend(parallel_results)
-        
+
         return results
-    
-    def _group_independent_tasks(self, tasks: List[CommandTask]) -> List[List[CommandTask]]:
+
+    def _group_independent_tasks(
+        self, tasks: List[CommandTask]
+    ) -> List[List[CommandTask]]:
         """Group tasks that can be executed independently."""
         # Simple implementation: group by resource conflicts
         groups = []
         used_resources = set()
-        
+
         for task in tasks:
             task_resources = self._get_task_resources(task)
-            
+
             if task_resources.isdisjoint(used_resources):
                 # Can be executed with existing group
                 if groups:
@@ -318,105 +316,110 @@ class ConcurrentToolExecutor:
                 # Needs new group
                 groups.append([task])
                 used_resources = task_resources
-        
+
         return groups
-    
+
     def _get_task_resources(self, task: CommandTask) -> Set[str]:
         """Get the resources that a task will access."""
         resources = set()
-        
+
         # Check for file operations
         for arg_name, arg_value in task.arguments.items():
-            if 'path' in arg_name.lower() or 'file' in arg_name.lower():
+            if "path" in arg_name.lower() or "file" in arg_name.lower():
                 if isinstance(arg_value, str):
                     resources.add(f"file:{arg_value}")
-        
+
         # Tool-specific resource mapping
         resource_maps = {
-            'git_status': {'git:status'},
-            'git_commit': {'git:commit'},
-            'git_diff': {'git:diff'},
-            'memory_write': {'memory:write'},
-            'memory_read': {'memory:read'},
+            "git_status": {"git:status"},
+            "git_commit": {"git:commit"},
+            "git_diff": {"git:diff"},
+            "memory_write": {"memory:write"},
+            "memory_read": {"memory:read"},
         }
-        
+
         if task.tool_name in resource_maps:
             resources.update(resource_maps[task.tool_name])
-        
+
         return resources
-    
+
     async def _execute_parallel_group(
         self,
         tasks: List[CommandTask],
         tool_registry: ToolRegistry,
-        side_effect_broker: SideEffectBroker
+        side_effect_broker: SideEffectBroker,
     ) -> List[ToolResult]:
         """Execute a group of tasks in parallel."""
+
         async def execute_task_with_semaphore(task):
             async with self.semaphore:
                 return await self._execute_single_task(
                     task, tool_registry, side_effect_broker
                 )
-        
+
         results = await asyncio.gather(
             *[execute_task_with_semaphore(task) for task in tasks],
-            return_exceptions=True
+            return_exceptions=True,
         )
-        
+
         # Convert exceptions to error results
         processed_results = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
-                processed_results.append(ToolResult(
-                    success=False,
-                    output="",
-                    error=f"Parallel execution error: {str(result)}"
-                ))
+                processed_results.append(
+                    ToolResult(
+                        success=False,
+                        output="",
+                        error=f"Parallel execution error: {str(result)}",
+                    )
+                )
             else:
                 processed_results.append(result)
-        
+
         return processed_results
-    
+
     async def _execute_single_task(
         self,
         task: CommandTask,
         tool_registry: ToolRegistry,
-        side_effect_broker: SideEffectBroker
+        side_effect_broker: SideEffectBroker,
     ) -> ToolResult:
         """Execute a single task with side effect tracking."""
         try:
-            # Record pre-execution state
-            pre_effects = len(side_effect_broker.effects)
-            
+            # Record pre-execution state for potential future use
+            # pre_effects = len(side_effect_broker.effects)
+
             # Execute the tool
             result = await tool_registry.execute_tool(task.tool_name, **task.arguments)
-            
+
             # Record side effects (simplified - in reality would be tool-specific)
-            if task.tool_name.startswith('file_'):
-                effect_type = SideEffectType.FILE_WRITE if 'write' in task.tool_name else SideEffectType.FILE_READ
+            if task.tool_name.startswith("file_"):
+                effect_type = (
+                    SideEffectType.FILE_WRITE
+                    if "write" in task.tool_name
+                    else SideEffectType.FILE_READ
+                )
                 effect = SideEffect(
                     effect_type=effect_type,
-                    target=task.arguments.get('path', 'unknown'),
+                    target=task.arguments.get("path", "unknown"),
                     operation=task.tool_name,
                     timestamp=time.time(),
                     tool_name=task.tool_name,
-                    metadata={'task_id': task.task_id}
+                    metadata={"task_id": task.task_id},
                 )
                 await side_effect_broker.record_effect(effect)
-            
+
             return result
-            
+
         except Exception as e:
             return ToolResult(
-                success=False,
-                output="",
-                error=f"Task execution failed: {str(e)}"
+                success=False, output="", error=f"Task execution failed: {str(e)}"
             )
 
 
 class AdvancedOrchestrator:
     """Advanced orchestrator with all improvements integrated."""
-    
+
     def __init__(self, tool_registry: ToolRegistry, max_concurrent: int = 5):
         self.tool_registry = tool_registry
         self.command_queue = CommandQueue()
@@ -425,13 +428,13 @@ class AdvancedOrchestrator:
         self.concurrent_executor = ConcurrentToolExecutor(max_concurrent)
         self.running = False
         self._worker_task: Optional[asyncio.Task] = None
-    
+
     async def start(self) -> None:
         """Start the orchestrator worker."""
         if not self.running:
             self.running = True
             self._worker_task = asyncio.create_task(self._worker_loop())
-    
+
     async def stop(self) -> None:
         """Stop the orchestrator worker."""
         self.running = False
@@ -441,13 +444,13 @@ class AdvancedOrchestrator:
                 await self._worker_task
             except asyncio.CancelledError:
                 pass
-    
+
     async def submit_task(
         self,
         tool_name: str,
         arguments: Dict[str, Any],
         priority: Priority = Priority.NORMAL,
-        dependencies: Optional[Set[str]] = None
+        dependencies: Optional[Set[str]] = None,
     ) -> str:
         """Submit a task for execution."""
         task = CommandTask(
@@ -455,41 +458,41 @@ class AdvancedOrchestrator:
             tool_name=tool_name,
             arguments=arguments,
             priority=priority,
-            dependencies=dependencies or set()
+            dependencies=dependencies or set(),
         )
-        
+
         await self.command_queue.enqueue(task)
         return task.task_id
-    
-    async def get_task_result(self, task_id: str, timeout: float = 30.0) -> Optional[ToolResult]:
+
+    async def get_task_result(
+        self, task_id: str, timeout: float = 30.0
+    ) -> Optional[ToolResult]:
         """Get the result of a task, waiting if necessary."""
         start_time = time.time()
-        
+
         while time.time() - start_time < timeout:
             if task_id in self.command_queue.completed_tasks:
                 return self.command_queue.completed_tasks[task_id].result
-            
+
             await asyncio.sleep(0.1)
-        
+
         return None
-    
+
     async def execute_task_group(
-        self,
-        tasks: List[Tuple[str, Dict[str, Any], Priority]],
-        parallel: bool = True
+        self, tasks: List[Tuple[str, Dict[str, Any], Priority]], parallel: bool = True
     ) -> List[ToolResult]:
         """Execute a group of tasks, optionally in parallel."""
         task_objects = []
-        
+
         for tool_name, arguments, priority in tasks:
             task = CommandTask(
                 task_id=str(uuid.uuid4()),
                 tool_name=tool_name,
                 arguments=arguments,
-                priority=priority
+                priority=priority,
             )
             task_objects.append(task)
-        
+
         if parallel:
             return await self.concurrent_executor.execute_parallel_tools(
                 task_objects, self.tool_registry, self.side_effect_broker
@@ -502,7 +505,7 @@ class AdvancedOrchestrator:
                 )
                 results.append(result)
             return results
-    
+
     async def _worker_loop(self) -> None:
         """Main worker loop for processing queued tasks."""
         while self.running:
@@ -515,23 +518,23 @@ class AdvancedOrchestrator:
                         lambda t: self.concurrent_executor._execute_single_task(
                             t, self.tool_registry, self.side_effect_broker
                         ),
-                        self.side_effect_broker
+                        self.side_effect_broker,
                     )
-                    
+
                     await self.command_queue.mark_completed(task.task_id, result)
                 else:
                     # No tasks available, wait a bit
                     await asyncio.sleep(0.1)
-                    
+
             except Exception as e:
                 logging.error(f"Worker loop error: {e}")
                 await asyncio.sleep(1.0)
-    
+
     def get_metrics(self) -> Dict[str, Any]:
         """Get orchestrator metrics."""
         return {
-            'active_tasks': len(self.command_queue.tasks),
-            'completed_tasks': len(self.command_queue.completed_tasks),
-            'total_side_effects': len(self.side_effect_broker.effects),
-            'running': self.running
+            "active_tasks": len(self.command_queue.tasks),
+            "completed_tasks": len(self.command_queue.completed_tasks),
+            "total_side_effects": len(self.side_effect_broker.effects),
+            "running": self.running,
         }
