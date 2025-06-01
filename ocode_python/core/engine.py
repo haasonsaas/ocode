@@ -130,27 +130,35 @@ class OCodeEngine:
         # Advanced orchestrator for priority-based command queuing and side effects
         if arch_config.get("enable_advanced_orchestrator", True):
             max_concurrent = arch_config.get("orchestrator_max_concurrent", 5)
-            self.orchestrator = AdvancedOrchestrator(self.tool_registry, max_concurrent)
+            self.orchestrator: Optional[AdvancedOrchestrator] = AdvancedOrchestrator(
+                self.tool_registry, max_concurrent
+            )
         else:
-            self.orchestrator = None
+            self.orchestrator: Optional[AdvancedOrchestrator] = None
 
         # Stream processor for read-write pipeline separation and intelligent batching
         if arch_config.get("enable_stream_processing", True):
-            self.stream_processor = StreamProcessor(self.context_manager)
+            self.stream_processor: Optional[StreamProcessor] = StreamProcessor(
+                self.context_manager
+            )
         else:
-            self.stream_processor = None
+            self.stream_processor: Optional[StreamProcessor] = None
 
         # Semantic context builder for embedding-based file selection
         if arch_config.get("enable_semantic_context", True):
-            self.semantic_context_builder = SemanticContextBuilder(self.context_manager)
+            self.semantic_context_builder: Optional[SemanticContextBuilder] = (
+                SemanticContextBuilder(self.context_manager)
+            )
         else:
-            self.semantic_context_builder = None
+            self.semantic_context_builder: Optional[SemanticContextBuilder] = None
 
         # Dynamic context manager for intelligent context expansion
         if arch_config.get("enable_dynamic_context", True):
-            self.dynamic_context_manager = DynamicContextManager(self.context_manager)
+            self.dynamic_context_manager: Optional[DynamicContextManager] = (
+                DynamicContextManager(self.context_manager)
+            )
         else:
-            self.dynamic_context_manager = None
+            self.dynamic_context_manager: Optional[DynamicContextManager] = None
 
         # Processing state management
         # These track the current conversation and processing state

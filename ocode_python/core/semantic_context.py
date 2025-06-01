@@ -22,7 +22,7 @@ try:
 except ImportError:
     # Fallback to basic semantic analysis
     EMBEDDINGS_AVAILABLE = False
-    SentenceTransformer = None
+    SentenceTransformer = None  # type: ignore
 
 import numpy as np
 
@@ -269,7 +269,7 @@ class SemanticContextBuilder:
 
             # Convert to numpy array if it's a tensor
             if hasattr(query_embedding, "numpy"):
-                query_embedding = query_embedding.numpy()
+                query_embedding = query_embedding.numpy()  # type: ignore
             elif not isinstance(query_embedding, np.ndarray):
                 query_embedding = np.array(query_embedding)
 
