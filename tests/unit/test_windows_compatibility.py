@@ -18,7 +18,9 @@ class TestWindowsCompatibility:
     @pytest.mark.asyncio
     @patch("platform.system", return_value="Windows")
     @patch("shutil.which")
-    async def test_bash_tool_windows_shell_preparation(self, mock_which, mock_platform):
+    async def test_bash_tool_windows_shell_preparation(
+        self, mock_which, _mock_platform
+    ):
         """Test Windows shell command preparation."""
         mock_which.side_effect = {
             "cmd": "C:\\Windows\\System32\\cmd.exe",
@@ -38,8 +40,10 @@ class TestWindowsCompatibility:
         result = bash_tool._prepare_shell_command("echo test", "powershell")
         assert result == [
             "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+            "-ExecutionPolicy",
+            "Bypass",
             "-Command",
-            "echo test",
+            "& {echo test}",
         ]
 
     @pytest.mark.asyncio
@@ -47,7 +51,7 @@ class TestWindowsCompatibility:
     @patch("shutil.which", return_value="C:\\Windows\\System32\\cmd.exe")
     @patch("asyncio.create_subprocess_exec")
     async def test_bash_tool_windows_execution(
-        self, mock_subprocess, mock_which, mock_platform
+        self, mock_subprocess, _mock_which, _mock_platform
     ):
         """Test Windows command execution."""
         # Mock process
@@ -68,7 +72,7 @@ class TestWindowsCompatibility:
     @patch("platform.system", return_value="Windows")
     @patch("subprocess.run")
     async def test_windows_process_termination(
-        self, mock_subprocess_run, mock_platform
+        self, mock_subprocess_run, _mock_platform
     ):
         """Test Windows-specific process termination."""
         from ocode_python.tools.bash_tool import _process_manager
@@ -144,7 +148,7 @@ class TestWindowsCompatibility:
                 assert reason, f"Should provide reason for blocking '{cmd}'"
 
     @patch("platform.system", return_value="Linux")
-    def test_command_sanitizer_unix_only(self, mock_platform):
+    def test_command_sanitizer_unix_only(self, _mock_platform):
         """Test that Windows patterns are not applied on Unix."""
         sanitizer = CommandSanitizer()
 
@@ -159,7 +163,7 @@ class TestWindowsCompatibility:
     @patch("tempfile.NamedTemporaryFile")
     @patch("os.chmod")
     async def test_windows_script_execution_no_chmod(
-        self, mock_chmod, mock_tempfile, mock_platform
+        self, mock_chmod, mock_tempfile, _mock_platform
     ):
         """Test that chmod is not called on Windows for script files."""
         mock_file = MagicMock()
@@ -185,7 +189,7 @@ class TestWindowsCompatibility:
     @patch("tempfile.NamedTemporaryFile")
     @patch("os.chmod")
     async def test_unix_script_execution_with_chmod(
-        self, mock_chmod, mock_tempfile, mock_platform
+        self, mock_chmod, mock_tempfile, _mock_platform
     ):
         """Test that chmod is called on Unix for script files."""
         mock_file = MagicMock()

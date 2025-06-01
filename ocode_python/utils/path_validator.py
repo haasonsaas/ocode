@@ -4,6 +4,7 @@ Provides robust validation against path traversal attacks and other security iss
 """
 
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Optional, Tuple, Union
@@ -96,7 +97,6 @@ class PathValidator:
             # Special handling for colons on Windows
             if self.platform.startswith("win") and ":" in path_str:
                 # Allow drive letters (C:, D:, etc.) but block alternate data streams
-                import re
 
                 # Check for valid Windows drive patterns
                 drive_pattern = r"^[A-Za-z]:[/\\]"  # C:\ or C:/

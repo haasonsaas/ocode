@@ -44,8 +44,14 @@ class TestPerformance:
         # Create a larger Python file
         large_file = temp_dir / "large.py"
         content = "\n".join(
-            [f"def function_{i}():", f"    '''Function {i}'''", f"    return {i}", ""]
+            line
             for i in range(1000)
+            for line in [
+                f"def function_{i}():",
+                f"    '''Function {i}'''",
+                f"    return {i}",
+                "",
+            ]
         )
 
         large_file.write_text(content)

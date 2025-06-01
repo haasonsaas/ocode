@@ -2,6 +2,7 @@
 Git integration tools.
 """
 
+import contextlib
 from typing import Any
 
 from git import InvalidGitRepositoryError, Repo
@@ -93,10 +94,8 @@ class GitStatusTool(Tool):
         finally:
             # Close the repository to release file handles
             if repo is not None:
-                try:
+                with contextlib.suppress(Exception):
                     repo.close()
-                except Exception:  # nosec B110
-                    pass  # Ignore errors during cleanup
 
 
 class GitCommitTool(Tool):
@@ -195,10 +194,8 @@ class GitCommitTool(Tool):
         finally:
             # Close the repository to release file handles
             if repo is not None:
-                try:
+                with contextlib.suppress(Exception):
                     repo.close()
-                except Exception:  # nosec B110
-                    pass  # Ignore errors during cleanup
 
 
 class GitDiffTool(Tool):
@@ -327,10 +324,8 @@ class GitDiffTool(Tool):
         finally:
             # Close the repository to release file handles
             if repo is not None:
-                try:
+                with contextlib.suppress(Exception):
                     repo.close()
-                except Exception:  # nosec B110
-                    pass  # Ignore errors during cleanup
 
 
 class GitBranchTool(Tool):

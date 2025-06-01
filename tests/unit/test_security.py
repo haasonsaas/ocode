@@ -359,14 +359,9 @@ class TestSecureShellExecutor:
         executor = SecureShellExecutor(manager)
 
         # Use platform-appropriate sleep command
-        if platform.system() == "Windows":
-            # Windows: Use ping to localhost as a delay mechanism (no redirection)
-            cmd = "ping -n 11 127.0.0.1"
-        else:
-            # Unix sleep command
-            cmd = "sleep 10"
+        cmd = "ping -n 11 127.0.0.1" if platform.system() == "Windows" else "sleep 10"
 
-        success, stdout, stderr = await executor.execute(cmd, timeout=1)
+        success, _, stderr = await executor.execute(cmd, timeout=1)
 
         assert not success
         assert "timed out" in stderr.lower()
