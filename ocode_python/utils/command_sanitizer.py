@@ -2,6 +2,7 @@
 Command sanitization utilities for shell execution safety.
 """
 
+import platform
 import re
 import shlex
 from typing import Dict, List, Optional, Tuple
@@ -12,7 +13,6 @@ class CommandSanitizer:
 
     def __init__(self):
         """Initialize sanitizer with dangerous patterns."""
-        import platform
 
         # Patterns that should never be allowed - Unix patterns
         unix_patterns = [

@@ -5,11 +5,14 @@ Enhanced Bash/Shell command execution tool with improved process management.
 import asyncio
 import io
 import os
+import platform
 import shlex
+import shutil
 import signal
+import subprocess  # nosec B404
 import tempfile
 import time
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -60,28 +63,18 @@ class ProcessManager:
                     await asyncio.wait_for(process.wait(), timeout=2.0)
                 except asyncio.TimeoutError:
                     # Process is really stuck, try OS-level kill
-                    import platform
-
-                    if platform.system() == "Windows":
+                    if platform.system() == "Windows" and process.pid:
                         # Windows-specific process termination
-                        if process.pid:
-                            try:
-                                import subprocess  # nosec B404
-
-                                subprocess.run(  # nosec B603 B607
-                                    ["taskkill", "/F", "/T", "/PID", str(process.pid)],
-                                    check=False,
-                                    capture_output=True,
-                                )
-                            except (OSError, subprocess.SubprocessError):
-                                pass
-                    else:
+                        with suppress(OSError, subprocess.SubprocessError):
+                            subprocess.run(  # nosec B603 B607
+                                ["taskkill", "/F", "/T", "/PID", str(process.pid)],
+                                check=False,
+                                capture_output=True,
+                            )
+                    elif hasattr(os, "killpg") and process.pid:
                         # Unix-specific process group kill
-                        if hasattr(os, "killpg") and process.pid:
-                            try:
-                                os.killpg(os.getpgid(process.pid), signal.SIGKILL)
-                            except (OSError, ProcessLookupError):
-                                pass
+                        with suppress(OSError, ProcessLookupError):
+                            os.killpg(os.getpgid(process.pid), signal.SIGKILL)
         except (ProcessLookupError, OSError):
             # Process already dead
             pass
@@ -318,9 +311,6 @@ class BashTool(Tool):
 
     def _prepare_shell_command(self, command: str, shell: str) -> List[str]:
         """Prepare shell command for execution with proper sanitization."""
-        import platform
-        import shutil
-
         # Windows-specific handling
         if platform.system() == "Windows":
             # On Windows, use cmd.exe or PowerShell
@@ -330,9 +320,10 @@ class BashTool(Tool):
                 if powershell_path:
                     return [powershell_path, "-Command", command]
 
-            # Default to cmd.exe on Windows
+            # Default to cmd.exe on Windows with proper quoting
             cmd_path = shutil.which("cmd") or "cmd.exe"
-            return [cmd_path, "/c", command]
+            # Quote command to prevent metacharacter interpretation
+            return [cmd_path, "/c", f'"{command}"']
 
         # Unix-like systems
         shell_map = {
@@ -384,8 +375,6 @@ class BashTool(Tool):
             }
 
             # Set up process group for better cleanup on Unix
-            import platform
-
             if platform.system() != "Windows" and hasattr(os, "setsid"):
                 kwargs["start_new_session"] = True  # More portable than preexec_fn
 
@@ -768,63 +757,58 @@ class ScriptTool(Tool):
 
             extension = script_extensions.get(script_type, ".sh")
 
-            with tempfile.NamedTemporaryFile(
-                mode="w",
+            # Create temporary script file (Windows-compatible approach)
+            fd, script_path = tempfile.mkstemp(
                 suffix=extension,
-                delete=not save_script,
-                encoding="utf-8",
-                dir=tempfile.gettempdir(),  # Use system temp dir
-            ) as script_file:
+                dir=tempfile.gettempdir(),
+            )
 
-                # Add shebang if needed (Unix only)
-                import platform
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as script_file:
+                    # Add shebang if needed (Unix only)
+                    if platform.system() != "Windows":
+                        if script_type == "bash":
+                            script_file.write("#!/bin/bash\nset -e\n\n")
+                        elif script_type == "python":
+                            script_file.write("#!/usr/bin/env python3\n\n")
+                        elif script_type in ["node", "javascript"]:
+                            script_file.write("#!/usr/bin/env node\n\n")
 
-                if platform.system() != "Windows":
-                    if script_type == "bash":
-                        script_file.write("#!/bin/bash\nset -e\n\n")
-                    elif script_type == "python":
-                        script_file.write("#!/usr/bin/env python3\n\n")
-                    elif script_type in ["node", "javascript"]:
-                        script_file.write("#!/usr/bin/env node\n\n")
-
-                script_file.write(script_content)
-                script_file.flush()
+                    script_file.write(script_content)
 
                 # Make script executable (Unix only)
                 if platform.system() != "Windows":
-                    os.chmod(script_file.name, 0o700)  # User read/write/execute only
+                    os.chmod(script_path, 0o700)  # User read/write/execute only
 
                 # Prepare execution command
-                import shutil
-
                 if script_type == "bash":
                     if platform.system() == "Windows":
                         # Use cmd or find bash on Windows
                         bash_path = shutil.which("bash") or shutil.which("git-bash")
                         if bash_path:
-                            cmd = [bash_path, script_file.name]
+                            cmd = [bash_path, script_path]
                         else:
                             # Fallback to cmd reading the script
                             cmd = [
                                 shutil.which("cmd") or "cmd.exe",
                                 "/c",
-                                f"type {script_file.name} | cmd",
+                                f"type {script_path} | cmd",
                             ]
                     else:
-                        cmd = [shutil.which("bash") or "bash", script_file.name]
+                        cmd = [shutil.which("bash") or "bash", script_path]
                 elif script_type == "python":
                     python_cmd = (
                         shutil.which("python3") or shutil.which("python") or "python"
                     )
-                    cmd = [python_cmd, script_file.name]
+                    cmd = [python_cmd, script_path]
                 elif script_type in ["node", "javascript"]:
                     node_cmd = shutil.which("node") or "node"
-                    cmd = [node_cmd, script_file.name]
+                    cmd = [node_cmd, script_path]
                 else:
                     if platform.system() == "Windows":
-                        cmd = [shutil.which("cmd") or "cmd.exe", "/c", script_file.name]
+                        cmd = [shutil.which("cmd") or "cmd.exe", "/c", script_path]
                     else:
-                        cmd = [shutil.which("sh") or "sh", script_file.name]
+                        cmd = [shutil.which("sh") or "sh", script_path]
 
                 # Execute script using BashTool
                 bash_tool = BashTool()
@@ -845,18 +829,26 @@ class ScriptTool(Tool):
                         {
                             "script_type": script_type,
                             "script_path": (
-                                script_file.name if save_script else "temporary"
+                                script_path if save_script else "temporary"
                             ),
                             "script_size": len(script_content),
                         }
                     )
 
                 if save_script:
-                    result.output = f"Script saved to: {script_file.name}\n\n" + (
+                    result.output = f"Script saved to: {script_path}\n\n" + (
                         result.output or ""
                     )
 
                 return result
+
+            finally:
+                # Clean up temporary file if not saving
+                if not save_script:
+                    try:
+                        os.unlink(script_path)
+                    except (OSError, FileNotFoundError):
+                        pass  # File already deleted or inaccessible
 
         except Exception as e:
             return ToolResult(
