@@ -182,10 +182,19 @@ class TestBashTool:
 
     @pytest.mark.asyncio
     async def test_bash_tool_simple_command(self):
+        import platform
+
         tool = BashTool()
 
-        # Test simple echo command
-        result = await tool.execute(command="echo 'Hello World'")
+        # Use platform-appropriate echo command
+        if platform.system() == "Windows":
+            # Windows echo doesn't need quotes
+            command = "echo Hello World"
+        else:
+            # Unix echo with quotes
+            command = "echo 'Hello World'"
+
+        result = await tool.execute(command=command)
         assert result.success
         assert "Hello World" in result.output
 
@@ -206,13 +215,24 @@ class TestBashTool:
 
     @pytest.mark.asyncio
     async def test_script_tool(self):
+        import platform
+
         tool = ScriptTool()
 
-        # Test multi-line script
-        script = """
-        echo "Line 1"
-        echo "Line 2"
-        """
+        # Use platform-appropriate script
+        if platform.system() == "Windows":
+            # Windows script without quotes
+            script = """
+            echo Line 1
+            echo Line 2
+            """
+        else:
+            # Unix script with quotes
+            script = """
+            echo "Line 1"
+            echo "Line 2"
+            """
+
         result = await tool.execute(script=script)
         assert result.success
         assert "Line 1" in result.output

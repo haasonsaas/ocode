@@ -33,6 +33,12 @@ class TestContextManagerEnhanced:
 
     def test_init_cache_dir_creation_failure(self, temp_dir: Path):
         """Test cache directory creation failure handling."""
+        import platform
+
+        # Skip this test on Windows as permission model is different
+        if platform.system() == "Windows":
+            pytest.skip("Permission test not applicable on Windows")
+
         # Make temp_dir read-only
         import os
 
@@ -130,6 +136,12 @@ class TestContextManagerEnhanced:
     @pytest.mark.asyncio
     async def test_analyze_file_permission_error(self, temp_dir: Path):
         """Test file analysis with permission errors."""
+        import platform
+
+        # Skip this test on Windows as permission model is different
+        if platform.system() == "Windows":
+            pytest.skip("Permission test not applicable on Windows")
+
         manager = ContextManager(temp_dir)
 
         # Create file with no read permissions

@@ -320,10 +320,10 @@ class BashTool(Tool):
                 if powershell_path:
                     return [powershell_path, "-Command", command]
 
-            # Default to cmd.exe on Windows with proper quoting
+            # Default to cmd.exe on Windows
             cmd_path = shutil.which("cmd") or "cmd.exe"
-            # Quote command to prevent metacharacter interpretation
-            return [cmd_path, "/c", f'"{command}"']
+            # Don't add extra quotes - let the subprocess module handle it
+            return [cmd_path, "/c", command]
 
         # Unix-like systems
         shell_map = {
@@ -812,7 +812,13 @@ class ScriptTool(Tool):
 
                 # Execute script using BashTool
                 bash_tool = BashTool()
-                command_str = " ".join(shlex.quote(arg) for arg in cmd)
+                # Don't double-quote on Windows - let Windows handle it
+                if platform.system() == "Windows":
+                    command_str = " ".join(
+                        f'"{arg}"' if " " in arg else arg for arg in cmd
+                    )
+                else:
+                    command_str = " ".join(shlex.quote(arg) for arg in cmd)
 
                 result = await bash_tool.execute(
                     command=command_str,

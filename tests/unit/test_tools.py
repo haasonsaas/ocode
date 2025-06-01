@@ -312,7 +312,9 @@ class TestFileTools:
         result = await tool.execute(path=str(mock_project_dir), recursive=True)
 
         assert result.success
-        assert "mypackage/module.py" in result.output
+        # Handle both Windows and Unix path separators - be more flexible
+        result_output = result.output.replace("\\", "/")  # Normalize to forward slashes
+        assert "mypackage/module.py" in result_output
 
     @pytest.mark.asyncio
     async def test_file_list_filter_extensions(self, mock_project_dir: Path):
@@ -427,12 +429,19 @@ class TestShellTools:
     @pytest.mark.asyncio
     async def test_shell_command_timeout(self):
         """Test shell command timeout."""
+        import platform
+
         tool = ShellCommandTool()
 
-        # Command that would run for a long time
-        result = await tool.execute(
-            command="python -c 'import time; time.sleep(10)'", timeout=1
-        )
+        # Use platform-appropriate long-running command
+        if platform.system() == "Windows":
+            # Windows timeout command
+            command = "timeout /t 10 /nobreak"
+        else:
+            # Unix sleep command
+            command = 'python -c "import time; time.sleep(10)"'
+
+        result = await tool.execute(command=command, timeout=1)
 
         assert not result.success
         assert "timed out" in result.error.lower()

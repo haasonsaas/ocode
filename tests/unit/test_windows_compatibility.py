@@ -29,9 +29,9 @@ class TestWindowsCompatibility:
 
         bash_tool = BashTool()
 
-        # Test default cmd.exe handling (with quoting for security)
+        # Test default cmd.exe handling
         result = bash_tool._prepare_shell_command("echo test", "bash")
-        assert result == ["C:\\Windows\\System32\\cmd.exe", "/c", '"echo test"']
+        assert result == ["C:\\Windows\\System32\\cmd.exe", "/c", "echo test"]
 
         # Test PowerShell handling
         result = bash_tool._prepare_shell_command("echo test", "powershell")
@@ -88,13 +88,23 @@ class TestWindowsCompatibility:
         )
 
     @pytest.mark.asyncio
-    @patch("platform.system", return_value="Unix")
+    @patch("platform.system", return_value="Linux")
     @patch("os.killpg")
     @patch("os.getpgid")
     async def test_unix_process_termination(
         self, mock_getpgid, mock_killpg, mock_platform
     ):
         """Test Unix-specific process termination for comparison."""
+        # Skip this test on actual Windows systems since Unix functions don't exist
+        import platform
+
+        if platform.system() == "Windows":
+            pytest.skip("Unix-specific test not applicable on Windows")
+
+        # Also skip if os.getpgid doesn't exist (Windows)
+        if not hasattr(__import__("os"), "getpgid"):
+            pytest.skip("os.getpgid not available on this platform")
+
         import signal
 
         from ocode_python.tools.bash_tool import _process_manager
