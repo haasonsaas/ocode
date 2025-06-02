@@ -11,7 +11,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, AsyncGenerator, Dict, List, Set
+from typing import Any, AsyncGenerator, Dict, List, Optional, Set
 
 from ..tools.base import ToolResult
 from .context_manager import ContextManager
@@ -193,6 +193,7 @@ class StreamProcessor:
         self._write_lock = asyncio.Lock()
 
         # Initialize predictive engine if enabled
+        self.predictive_engine: Optional["PredictiveEngine"]
         if enable_predictive:
             self.predictive_engine = PredictiveEngine(self)
         else:
