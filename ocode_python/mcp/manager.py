@@ -13,7 +13,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional
 
-import psutil
+try:
+    import psutil
+
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    psutil = None
+    PSUTIL_AVAILABLE = False
 
 from ..utils.config import ConfigManager
 
@@ -87,16 +93,20 @@ class MCPServerManager:
             else:
                 # Check if process is running from a previous session
                 if info.pid:
-                    try:
-                        ps_process = psutil.Process(info.pid)
-                        if ps_process.is_running():
-                            info.status = "running"
-                        else:
+                    if PSUTIL_AVAILABLE:
+                        try:
+                            ps_process = psutil.Process(info.pid)
+                            if ps_process.is_running():
+                                info.status = "running"
+                            else:
+                                info.status = "stopped"
+                                info.pid = None
+                        except (psutil.NoSuchProcess, psutil.AccessDenied):
                             info.status = "stopped"
                             info.pid = None
-                    except (psutil.NoSuchProcess, psutil.AccessDenied):
-                        info.status = "stopped"
-                        info.pid = None
+                    else:
+                        # Fallback: just mark as unknown status without psutil
+                        info.status = "unknown"
                 else:
                     info.status = "stopped"
 
@@ -201,22 +211,35 @@ class MCPServerManager:
 
         elif info.pid:
             # Try to stop by PID (from previous session)
-            try:
-                process = psutil.Process(info.pid)
-                process.terminate()
-
-                # Wait for termination
+            if PSUTIL_AVAILABLE:
                 try:
-                    process.wait(timeout=5)
-                except psutil.TimeoutExpired:
-                    process.kill()
+                    process = psutil.Process(info.pid)
+                    process.terminate()
 
-                info.status = "stopped"
-                info.pid = None
+                    # Wait for termination
+                    try:
+                        process.wait(timeout=5)
+                    except psutil.TimeoutExpired:
+                        process.kill()
 
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                info.status = "stopped"
-                info.pid = None
+                    info.status = "stopped"
+                    info.pid = None
+
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    info.status = "stopped"
+                    info.pid = None
+            else:
+                # Fallback: try OS kill command
+                try:
+                    import os
+                    import signal
+
+                    os.kill(info.pid, signal.SIGTERM)
+                    info.status = "stopped"
+                    info.pid = None
+                except (OSError, ProcessLookupError):
+                    info.status = "stopped"
+                    info.pid = None
 
         else:
             info.status = "stopped"

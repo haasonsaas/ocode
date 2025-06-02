@@ -3,12 +3,20 @@
 from datetime import datetime
 from unittest.mock import MagicMock, Mock, patch
 
-import psutil
+try:
+    import psutil
+
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    psutil = None
+    PSUTIL_AVAILABLE = False
+
 import pytest
 
 from ocode_python.tools.process_tool import ProcessMonitorTool
 
 
+@pytest.mark.skipif(not PSUTIL_AVAILABLE, reason="psutil not available")
 class TestProcessMonitorTool:
     """Test ProcessMonitorTool functionality."""
 

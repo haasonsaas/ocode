@@ -24,7 +24,7 @@ from ocode_python.tools.sticker_tool import StickerRequestTool  # noqa: E402
 from ocode_python.tools.think_tool import ThinkTool  # noqa: E402
 
 
-class TestRunner:
+class SimpleTestRunner:
     """Simple test runner without pytest."""
 
     def __init__(self):
@@ -218,7 +218,7 @@ class TestRunner:
 
 def main():
     """Run all tests."""
-    runner = TestRunner()
+    runner = SimpleTestRunner()
     success = runner.run_all_tests()
 
     if success:
