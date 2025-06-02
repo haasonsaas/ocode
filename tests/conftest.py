@@ -32,8 +32,48 @@ def event_loop():
 @pytest.fixture
 def temp_dir() -> Generator[Path, None, None]:
     """Create a temporary directory for tests."""
-    with tempfile.TemporaryDirectory() as tmp_dir:
+    import platform
+    import time
+
+    # Create temp directory manually for better Windows cleanup control
+    tmp_dir = tempfile.mkdtemp()
+    try:
         yield Path(tmp_dir)
+    finally:
+        # Custom cleanup with Windows compatibility
+        import shutil
+
+        if platform.system() == "Windows":
+            # On Windows, retry deletion with delays
+            for attempt in range(3):
+                try:
+                    shutil.rmtree(tmp_dir)
+                    break
+                except PermissionError:
+                    if attempt < 2:  # Don't sleep on the last attempt
+                        time.sleep(0.5 * (attempt + 1))  # Increasing delays
+                    else:
+                        # Last resort: try to delete individual files
+                        try:
+                            for root, dirs, files in os.walk(tmp_dir, topdown=False):
+                                for file in files:
+                                    try:
+                                        os.chmod(os.path.join(root, file), 0o777)
+                                        os.remove(os.path.join(root, file))
+                                    except (OSError, PermissionError):
+                                        pass
+                                for dir in dirs:
+                                    try:
+                                        os.rmdir(os.path.join(root, dir))
+                                    except (OSError, PermissionError):
+                                        pass
+                            os.rmdir(tmp_dir)
+                        except (OSError, PermissionError):
+                            # If all else fails, leave it for Windows cleanup
+                            pass
+        else:
+            # Unix/Linux: normal cleanup
+            shutil.rmtree(tmp_dir)
 
 
 @pytest.fixture
@@ -321,10 +361,46 @@ def mock_git_repo(mock_project_dir: Path):
 
     # Windows-specific cleanup to release Git file handles
     if platform.system() == "Windows":
-        # Force Git to release file handles
+        # Windows has issues with Git holding file handles open
+        # Try multiple strategies to release them
         try:
-            subprocess.run(["git", "gc"], cwd=mock_project_dir, check=False)
-            time.sleep(0.2)  # Give Windows time to release file handles
+            # Strategy 1: Git cleanup commands
+            subprocess.run(
+                ["git", "gc", "--prune=now"],
+                cwd=mock_project_dir,
+                check=False,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "reset", "--hard"],
+                cwd=mock_project_dir,
+                check=False,
+                capture_output=True,
+            )
+            time.sleep(0.2)
+
+            # Strategy 2: Kill git processes that might be holding handles
+            try:
+                subprocess.run(
+                    ["taskkill", "/F", "/IM", "git.exe"],
+                    check=False,
+                    capture_output=True,
+                    timeout=5,
+                )
+            except (subprocess.TimeoutExpired, FileNotFoundError):
+                pass
+
+            # Strategy 3: Wait for Windows to release file handles
+            time.sleep(1.0)
+
+        except Exception:
+            # If cleanup fails, just wait longer for Windows
+            time.sleep(2.0)
+
+        # Additional Windows-specific workaround: try to change to a different directory
+        # before pytest tries to clean up the temp directory
+        try:
+            os.chdir(Path.cwd())
         except Exception:
             pass
 
