@@ -90,31 +90,43 @@ class CommandQueue:
     """Priority-based command queue with dependency tracking."""
 
     def __init__(self):
-        self.high_priority: asyncio.Queue[str] = asyncio.Queue()
-        self.normal_priority: asyncio.Queue[str] = asyncio.Queue()
-        self.background: asyncio.Queue[str] = asyncio.Queue()
+        self.high_priority: Optional[asyncio.Queue[str]] = None
+        self.normal_priority: Optional[asyncio.Queue[str]] = None
+        self.background: Optional[asyncio.Queue[str]] = None
         self.tasks: Dict[str, CommandTask] = {}
         self.completed_tasks: Dict[str, CommandTask] = {}
-        self._lock = asyncio.Lock()
+        self._lock: Optional[asyncio.Lock] = None
+        self._initialized = False
+
+    async def _ensure_initialized(self) -> None:
+        """Ensure queues are initialized with an active event loop."""
+        if not self._initialized:
+            self.high_priority = asyncio.Queue()
+            self.normal_priority = asyncio.Queue()
+            self.background = asyncio.Queue()
+            self._lock = asyncio.Lock()
+            self._initialized = True
 
     async def enqueue(self, task: CommandTask) -> None:
         """Add a task to the appropriate priority queue."""
-        async with self._lock:
+        await self._ensure_initialized()
+        async with self._lock:  # type: ignore[union-attr]
             self.tasks[task.task_id] = task
 
             if task.priority == Priority.HIGH:
-                await self.high_priority.put(task.task_id)
+                await self.high_priority.put(task.task_id)  # type: ignore[union-attr]
             elif task.priority == Priority.NORMAL:
-                await self.normal_priority.put(task.task_id)
+                await self.normal_priority.put(task.task_id)  # type: ignore[union-attr]
             else:
-                await self.background.put(task.task_id)
+                await self.background.put(task.task_id)  # type: ignore[union-attr]
 
     async def dequeue(self) -> Optional[CommandTask]:
         """Get the next task to execute, respecting priority and dependencies."""
-        async with self._lock:
+        await self._ensure_initialized()
+        async with self._lock:  # type: ignore[union-attr]
             # Always prefer high > normal > background
             for queue in [self.high_priority, self.normal_priority, self.background]:
-                if not queue.empty():
+                if queue and not queue.empty():
                     try:
                         task_id = queue.get_nowait()
                         task = self.tasks.get(task_id)
@@ -136,7 +148,8 @@ class CommandQueue:
 
     async def mark_completed(self, task_id: str, result: ToolResult) -> None:
         """Mark a task as completed."""
-        async with self._lock:
+        await self._ensure_initialized()
+        async with self._lock:  # type: ignore[union-attr]
             if task_id in self.tasks:
                 task = self.tasks.pop(task_id)
                 task.completed_at = time.time()
@@ -150,11 +163,19 @@ class SideEffectBroker:
     def __init__(self):
         self.effects: List[SideEffect] = []
         self.file_backups: Dict[str, bytes] = {}  # For rollback
-        self._lock = asyncio.Lock()
+        self._lock: Optional[asyncio.Lock] = None
+        self._initialized = False
+
+    async def _ensure_initialized(self) -> None:
+        """Ensure lock is initialized with an active event loop."""
+        if not self._initialized:
+            self._lock = asyncio.Lock()
+            self._initialized = True
 
     async def record_effect(self, effect: SideEffect) -> None:
         """Record a side effect."""
-        async with self._lock:
+        await self._ensure_initialized()
+        async with self._lock:  # type: ignore[union-attr]
             self.effects.append(effect)
 
             # Create backup for file operations
@@ -172,7 +193,8 @@ class SideEffectBroker:
 
     async def rollback_effects(self, task_id: str) -> None:
         """Rollback side effects for a specific task."""
-        async with self._lock:
+        await self._ensure_initialized()
+        async with self._lock:  # type: ignore[union-attr]
             task_effects = [
                 e for e in self.effects if e.metadata.get("task_id") == task_id
             ]
