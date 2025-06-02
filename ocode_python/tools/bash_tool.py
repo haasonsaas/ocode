@@ -870,6 +870,7 @@ class ScriptTool(Tool):
                     platform.system() == "Windows"
                     and script_type == "bash"
                     and len(cmd) >= 2
+                    and work_dir is not None
                 ):
                     # On Windows with bash, execute directly to avoid quoting issues
                     result = await self._execute_script_directly(
