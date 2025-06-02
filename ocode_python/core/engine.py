@@ -1609,14 +1609,35 @@ When a user asks you to perform an action, call the appropriate function."""
             if self.verbose:
                 print("🛑 Advanced orchestrator stopped")
 
+    async def cleanup_architecture_components(self) -> None:
+        """Clean up all architecture components."""
+        # Clean up stream processor
+        if self.stream_processor:
+            try:
+                await self.stream_processor.cleanup()
+                if self.verbose:
+                    print("🧹 Stream processor cleaned up")
+            except Exception as e:
+                if self.verbose:
+                    print(f"⚠️ Stream processor cleanup error: {e}")
+
+        # Clean up orchestrator
+        await self.stop_orchestrator()
+
+        # Other components don't need explicit cleanup but we could add logging
+        if self.verbose and (
+            self.semantic_context_builder or self.dynamic_context_manager
+        ):
+            print("🧹 Architecture components cleaned up")
+
     async def __aenter__(self):
         """Async context manager entry - start orchestrator."""
         await self.start_orchestrator()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Async context manager exit - stop orchestrator."""
-        await self.stop_orchestrator()
+        """Async context manager exit - cleanup all architecture components."""
+        await self.cleanup_architecture_components()
 
 
 async def main() -> None:

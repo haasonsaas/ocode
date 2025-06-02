@@ -309,7 +309,7 @@ class SemanticContextBuilder:
                 similarity = np.dot(query_embedding, cached_embedding) / (
                     np.linalg.norm(query_embedding) * np.linalg.norm(cached_embedding)
                 )
-                semantic_file.similarity_score = float(similarity)
+                semantic_file.similarity_score = max(0.0, float(similarity))
             else:
                 # Need to compute embedding
                 # Truncate content to reasonable length for embedding
@@ -344,7 +344,7 @@ class SemanticContextBuilder:
                     similarity = np.dot(query_embedding, embedding) / (
                         np.linalg.norm(query_embedding) * np.linalg.norm(embedding)
                     )
-                    semantic_file.similarity_score = float(similarity)
+                    semantic_file.similarity_score = max(0.0, float(similarity))
 
             except Exception as e:
                 logging.warning(f"Error encoding batch: {e}")
@@ -353,10 +353,14 @@ class SemanticContextBuilder:
         self, query: str, semantic_files: List[SemanticFile]
     ) -> None:
         """Fallback keyword-based similarity scoring."""
-        query_words = set(query.lower().split())
+        import re
+
+        # Extract words using regex to handle punctuation better
+        query_words = set(re.findall(r"\b\w+\b", query.lower()))
 
         for semantic_file in semantic_files:
-            content_words = set(semantic_file.content.lower().split())
+            # Extract words from content, handling JSON and other formats
+            content_words = set(re.findall(r"\b\w+\b", semantic_file.content.lower()))
 
             if query_words and content_words:
                 intersection = query_words.intersection(content_words)
@@ -432,14 +436,20 @@ class SemanticContextBuilder:
             import re
 
             for line in lines:
-                # JavaScript/TypeScript imports
+                # JavaScript/TypeScript imports - handle both forms:
+                # import ... from 'module' and import 'module'
                 match = re.match(r'^\s*import\s+.*?from\s+["\']([^"\']+)["\']', line)
+                if not match:
+                    # Try direct import pattern: import 'module'
+                    match = re.match(r'^\s*import\s+["\']([^"\']+)["\']', line)
+
                 if match:
                     module = match.group(1)
                     if module.startswith("./") or module.startswith("../"):
-                        # Relative import
+                        # Relative import - include the full path
                         imports.append(module)
                     else:
+                        # Package import - include the package name
                         imports.append(module.split("/")[0])
 
         return imports

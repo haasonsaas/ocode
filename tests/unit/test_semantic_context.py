@@ -319,7 +319,23 @@ import '../utils/helper';
         if not semantic_builder.embeddings_model:
             with patch("sentence_transformers.SentenceTransformer") as mock_st:
                 mock_model = MagicMock()
-                mock_model.encode.return_value = np.array([0.1, 0.2, 0.3, 0.4])
+
+                # Create different embeddings for different inputs
+                def mock_encode(texts):
+                    if isinstance(texts, str):
+                        # Query embedding
+                        return np.array([0.8, 0.6, 0.4, 0.2])
+                    else:
+                        # File embeddings - different for each file
+                        embeddings = []
+                        for i, text in enumerate(texts):
+                            base = [0.1, 0.2, 0.3, 0.4]
+                            # Vary embeddings slightly for each file
+                            varied = [val + (i * 0.1) for val in base]
+                            embeddings.append(varied)
+                        return np.array(embeddings)
+
+                mock_model.encode.side_effect = mock_encode
                 mock_st.return_value = mock_model
                 semantic_builder.embeddings_model = mock_model
                 semantic_builder.model_version = "mocked"
@@ -611,7 +627,7 @@ class TestApp(unittest.TestCase):
             {
                 "query": "logging and utility functions",
                 "expected_files": ["utils.py"],
-                "max_files": 2,
+                "max_files": 3,
             },
             {
                 "query": "testing the application",

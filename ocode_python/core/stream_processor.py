@@ -105,11 +105,11 @@ class ContextBatcher:
                 if current_size + estimated_size > max_batch_size and current_batch:
                     # Start new batch
                     batches.append(current_batch)
-                    current_batch = []
-                    current_size = 0
-
-                current_batch.append(file_path)
-                current_size += estimated_size
+                    current_batch = [file_path]
+                    current_size = estimated_size
+                else:
+                    current_batch.append(file_path)
+                    current_size += estimated_size
 
         if current_batch:
             batches.append(current_batch)
@@ -184,13 +184,19 @@ class ContextBatcher:
 class StreamProcessor:
     """Core stream processing engine with read-write separation."""
 
-    def __init__(self, context_manager: ContextManager):
+    def __init__(self, context_manager: ContextManager, enable_predictive: bool = True):
         self.context_manager = context_manager
         self.context_batcher = ContextBatcher(context_manager)
         self.operation_results: Dict[str, OperationResult] = {}
         self.read_cache: Dict[str, Any] = {}
         self._read_lock = asyncio.Lock()
         self._write_lock = asyncio.Lock()
+
+        # Initialize predictive engine if enabled
+        if enable_predictive:
+            self.predictive_engine = PredictiveEngine(self)
+        else:
+            self.predictive_engine = None
 
     async def process_pipeline(
         self, operations: List[Operation]
@@ -458,6 +464,15 @@ class StreamProcessor:
             ),
         }
 
+    async def cleanup(self) -> None:
+        """Clean up stream processor resources."""
+        if self.predictive_engine:
+            await self.predictive_engine.cleanup()
+
+        # Clear caches
+        self.read_cache.clear()
+        self.operation_results.clear()
+
 
 class PredictiveEngine:
     """Predictive engine for pre-execution and cache warming."""
@@ -538,8 +553,8 @@ class PredictiveEngine:
         """Record tool execution for pattern learning."""
         self.execution_history.append(tool_name)
 
-        # Keep history manageable
-        if len(self.execution_history) > 100:
+        # Keep history manageable - maintain exactly 50 items max
+        if len(self.execution_history) > 50:
             self.execution_history = self.execution_history[-50:]
 
     async def cleanup(self) -> None:
