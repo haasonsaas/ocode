@@ -277,8 +277,9 @@ class SemanticContextBuilder:
             batch_size = 10
             for i in range(0, len(semantic_files), batch_size):
                 batch = semantic_files[i : i + batch_size]
-                # type: ignore
-                await self._process_embedding_batch(query_embedding, batch)
+                await self._process_embedding_batch(  # type: ignore
+                    query_embedding, batch
+                )
 
         except Exception as e:
             logging.warning(f"Error computing semantic scores: {e}")
