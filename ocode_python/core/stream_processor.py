@@ -8,6 +8,7 @@ context batching.
 
 import asyncio
 import logging
+import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -194,7 +195,7 @@ class StreamProcessor:
         self.read_cache: Dict[str, Any] = {}
         self._read_lock: Optional[asyncio.Lock] = None
         self._write_lock: Optional[asyncio.Lock] = None
-        self._locks_initialized = False
+        self._init_thread_lock = threading.Lock()
 
         # Initialize predictive engine if enabled
         self.predictive_engine: Optional[PredictiveEngine]
@@ -204,11 +205,18 @@ class StreamProcessor:
             self.predictive_engine = None
 
     async def _ensure_locks_initialized(self) -> None:
-        """Ensure locks are initialized with an active event loop."""
-        if not self._locks_initialized:
-            self._read_lock = asyncio.Lock()
-            self._write_lock = asyncio.Lock()
-            self._locks_initialized = True
+        """Ensure locks are initialized using thread-safe pattern."""
+        # Fast path: check if already initialized
+        if self._read_lock is not None and self._write_lock is not None:
+            return
+
+        # Use thread lock for thread-safe lazy initialization
+        with self._init_thread_lock:
+            # Double-check pattern: check again after acquiring lock
+            if self._read_lock is None:
+                self._read_lock = asyncio.Lock()
+            if self._write_lock is None:
+                self._write_lock = asyncio.Lock()
 
     async def process_pipeline(
         self, operations: List[Operation]

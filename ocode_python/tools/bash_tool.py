@@ -8,6 +8,7 @@ import os
 import shlex
 import signal
 import tempfile
+import threading
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -32,13 +33,19 @@ class ProcessManager:
     def __init__(self):
         self.active_processes = set()
         self._cleanup_lock: Optional[asyncio.Lock] = None
-        self._lock_initialized = False
+        self._init_thread_lock = threading.Lock()
 
     async def _ensure_lock_initialized(self) -> None:
-        """Ensure lock is initialized with an active event loop."""
-        if not self._lock_initialized:
-            self._cleanup_lock = asyncio.Lock()
-            self._lock_initialized = True
+        """Ensure lock is initialized using thread-safe pattern."""
+        # Fast path: check if already initialized
+        if self._cleanup_lock is not None:
+            return
+
+        # Use thread lock for thread-safe lazy initialization
+        with self._init_thread_lock:
+            # Double-check pattern: check again after acquiring lock
+            if self._cleanup_lock is None:
+                self._cleanup_lock = asyncio.Lock()
 
     async def register_process(self, process):
         """Register a process for tracking."""

@@ -11,6 +11,7 @@ This module implements sophisticated orchestration patterns including:
 
 import asyncio
 import logging
+import threading
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -96,16 +97,30 @@ class CommandQueue:
         self.tasks: Dict[str, CommandTask] = {}
         self.completed_tasks: Dict[str, CommandTask] = {}
         self._lock: Optional[asyncio.Lock] = None
-        self._initialized = False
+        self._init_thread_lock = threading.Lock()
 
     async def _ensure_initialized(self) -> None:
-        """Ensure queues are initialized with an active event loop."""
-        if not self._initialized:
-            self.high_priority = asyncio.Queue()
-            self.normal_priority = asyncio.Queue()
-            self.background = asyncio.Queue()
-            self._lock = asyncio.Lock()
-            self._initialized = True
+        """Ensure queues are initialized using thread-safe pattern."""
+        # Fast path: check if already initialized
+        if (
+            self.high_priority is not None
+            and self.normal_priority is not None
+            and self.background is not None
+            and self._lock is not None
+        ):
+            return
+
+        # Use thread lock for thread-safe lazy initialization
+        with self._init_thread_lock:
+            # Double-check pattern: check again after acquiring lock
+            if self.high_priority is None:
+                self.high_priority = asyncio.Queue()
+            if self.normal_priority is None:
+                self.normal_priority = asyncio.Queue()
+            if self.background is None:
+                self.background = asyncio.Queue()
+            if self._lock is None:
+                self._lock = asyncio.Lock()
 
     async def enqueue(self, task: CommandTask) -> None:
         """Add a task to the appropriate priority queue."""
@@ -164,13 +179,19 @@ class SideEffectBroker:
         self.effects: List[SideEffect] = []
         self.file_backups: Dict[str, bytes] = {}  # For rollback
         self._lock: Optional[asyncio.Lock] = None
-        self._initialized = False
+        self._init_thread_lock = threading.Lock()
 
     async def _ensure_initialized(self) -> None:
-        """Ensure lock is initialized with an active event loop."""
-        if not self._initialized:
-            self._lock = asyncio.Lock()
-            self._initialized = True
+        """Ensure lock is initialized using thread-safe pattern."""
+        # Fast path: check if already initialized
+        if self._lock is not None:
+            return
+
+        # Use thread lock for thread-safe lazy initialization
+        with self._init_thread_lock:
+            # Double-check pattern: check again after acquiring lock
+            if self._lock is None:
+                self._lock = asyncio.Lock()
 
     async def record_effect(self, effect: SideEffect) -> None:
         """Record a side effect."""
