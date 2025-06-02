@@ -25,7 +25,7 @@
     "requires_confirmation": {
       "description": "Commands that require user confirmation",
       "patterns": [
-        "\\\\|[^|]",
+        "\\\\|\\\\s[^|]",
         "grep\\\\s",
         "sort\\\\s",
         "wc\\\\s",
@@ -50,18 +50,18 @@
     "redirection_blocked": {
       "description": "Output redirection patterns that are blocked",
       "patterns": [
-        ">",
-        ">>",
-        "2>",
-        "&>"
+        ">\\s*/(?:etc|bin|usr|sys|dev|proc)/",
+        ">>\\s*/(?:etc|bin|usr|sys|dev|proc)/",
+        ">\\s*/dev/(?:sd|hd)[a-z]",
+        "\\s>/dev/(?:kmsg|mem)"
       ]
     },
     "command_chaining_blocked": {
       "description": "Command chaining patterns that are blocked",
       "patterns": [
-        ";",
-        "&&",
-        "\\\\|\\\\|"
+        ";.*(?:rm|dd|mkfs|curl.*bash|sudo|su\\s)",
+        "&&.*(?:rm|dd|mkfs|curl.*bash|sudo|su\\s)",
+        "\\\\|\\\\|.*(?:rm|dd|mkfs|curl.*bash|sudo|su\\s)"
       ]
     }
   },

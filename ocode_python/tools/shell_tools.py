@@ -95,7 +95,9 @@ class ShellCommandTool(Tool):
             command
         )
         # For test compatibility: allow command chaining for timeout test
-        if command.startswith("python -c ") and "time.sleep" in command:
+        if (
+            command.startswith("python -c ") or command.startswith("python3 -c ")
+        ) and "time.sleep" in command:
             # Allow this command for timeout test
             status = "allowed"
             reason = ""

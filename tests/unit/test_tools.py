@@ -438,10 +438,10 @@ class TestShellTools:
             # Windows: Use ping to localhost as a delay mechanism (no redirection)
             command = "ping -n 11 127.0.0.1"
         else:
-            # Unix sleep command
-            command = 'python -c "import time; time.sleep(10)"'
+            # Unix sleep command - use python3 explicitly
+            command = 'python3 -c "import time; time.sleep(10)"'
 
-        result = await tool.execute(command=command, timeout=1)
+        result = await tool.execute(command=command, timeout=1, safe_mode=False)
 
         assert not result.success
         assert "timed out" in result.error.lower()
