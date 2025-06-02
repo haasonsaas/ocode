@@ -684,7 +684,23 @@ class DynamicContextManager:
 
     def __init__(self, base_context_manager: ContextManager):
         self.base_context_manager = base_context_manager
-        self.semantic_builder = SemanticContextBuilder(base_context_manager)
+
+        # Check CI environment before creating semantic builder
+        import os
+
+        is_ci = bool(
+            os.getenv("CI") or os.getenv("GITHUB_ACTIONS") or os.getenv("JENKINS_URL")
+        )
+
+        if is_ci:
+            # In CI environments, skip semantic builder to avoid segfaults
+            self.semantic_builder = None
+            logging.info(
+                "DynamicContextManager: CI detected, disabling semantic builder"
+            )
+        else:
+            self.semantic_builder = SemanticContextBuilder(base_context_manager)
+
         self.context_history: List[Dict[str, Any]] = []
         self.expansion_cache: Dict[str, List[Path]] = {}
 
@@ -697,15 +713,21 @@ class DynamicContextManager:
             query, max_files=initial_max_files
         )
 
-        # Apply semantic analysis
-        semantic_files = await self.semantic_builder.build_semantic_context(
-            query,
-            base_context.files,  # type: ignore[arg-type]
-            max_files=int(initial_max_files * expansion_factor),
-        )
-
-        # Rebuild context with semantically selected files
-        selected_paths = [sf.path for sf in semantic_files]
+        # Apply semantic analysis if available
+        if self.semantic_builder:
+            semantic_files = await self.semantic_builder.build_semantic_context(
+                query,
+                base_context.files,  # type: ignore[arg-type]
+                max_files=int(initial_max_files * expansion_factor),
+            )
+            # Rebuild context with semantically selected files
+            selected_paths = [sf.path for sf in semantic_files]
+        else:
+            # Fallback to basic file selection when semantic builder is disabled
+            semantic_files = []
+            selected_paths = list(base_context.files.keys())[
+                : int(initial_max_files * expansion_factor)
+            ]
 
         # Create enhanced context
         enhanced_files = {}
@@ -728,13 +750,15 @@ class DynamicContextManager:
         )
 
         # Store context history for learning
+        breadcrumbs = []
+        if self.semantic_builder and semantic_files:
+            breadcrumbs = self.semantic_builder.get_context_breadcrumbs(semantic_files)
+
         self.context_history.append(
             {
                 "query": query,
                 "selected_files": selected_paths,
-                "breadcrumbs": self.semantic_builder.get_context_breadcrumbs(
-                    semantic_files
-                ),
+                "breadcrumbs": breadcrumbs,
                 "timestamp": time.time(),
             }
         )
@@ -765,14 +789,17 @@ class DynamicContextManager:
                 if content:
                     candidate_content[file_path] = content
 
-            # Apply semantic selection for expansion
-            semantic_files = await self.semantic_builder.build_semantic_context(
-                expansion_hint,
-                candidate_content,  # type: ignore[arg-type]
-                max_files=max_additional_files,
-            )
-
-            additional_paths = [sf.path for sf in semantic_files]
+            # Apply semantic selection for expansion if available
+            if self.semantic_builder:
+                semantic_files = await self.semantic_builder.build_semantic_context(
+                    expansion_hint,
+                    candidate_content,  # type: ignore[arg-type]
+                    max_files=max_additional_files,
+                )
+                additional_paths = [sf.path for sf in semantic_files]
+            else:
+                # Fallback to simple file selection when semantic builder is disabled
+                additional_paths = list(candidate_content.keys())[:max_additional_files]
             self.expansion_cache[cache_key] = additional_paths
 
         # Add additional files to context
