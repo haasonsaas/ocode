@@ -309,6 +309,7 @@ class SemanticContextBuilder:
                 similarity = np.dot(query_embedding, cached_embedding) / (
                     np.linalg.norm(query_embedding) * np.linalg.norm(cached_embedding)
                 )
+                # Clip negative cosine similarity values to prevent negative scores
                 semantic_file.similarity_score = max(0.0, float(similarity))
             else:
                 # Need to compute embedding
@@ -344,7 +345,8 @@ class SemanticContextBuilder:
                     similarity = np.dot(query_embedding, embedding) / (
                         np.linalg.norm(query_embedding) * np.linalg.norm(embedding)
                     )
-                    semantic_file.similarity_score = max(0.0, float(similarity))
+                    # Clip negative cosine similarity values to prevent negative scores
+                semantic_file.similarity_score = max(0.0, float(similarity))
 
             except Exception as e:
                 logging.warning(f"Error encoding batch: {e}")

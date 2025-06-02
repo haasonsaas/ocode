@@ -20,7 +20,13 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 from ..tools.base import ToolRegistry, ToolResult
 
-# Timeout functionality is available from timeout_handler module
+# Constants for retry and timing behavior
+DEFAULT_MAX_RETRIES = 3
+DEFAULT_BASE_DELAY = 1.0
+DEFAULT_MAX_CONCURRENT = 5
+WORKER_SLEEP_INTERVAL = 0.1
+TASK_POLLING_INTERVAL = 0.1
+ERROR_RECOVERY_DELAY = 1.0
 
 
 class Priority(Enum):
@@ -71,7 +77,7 @@ class CommandTask:
     completed_at: Optional[float] = None
     result: Optional[ToolResult] = None
     retry_count: int = 0
-    max_retries: int = 3
+    max_retries: int = DEFAULT_MAX_RETRIES
 
 
 class TransientError(Exception):
@@ -192,7 +198,11 @@ class SideEffectBroker:
 class RetryManager:
     """Manages retry logic with exponential backoff."""
 
-    def __init__(self, max_retries: int = 3, base_delay: float = 1.0):
+    def __init__(
+        self,
+        max_retries: int = DEFAULT_MAX_RETRIES,
+        base_delay: float = DEFAULT_BASE_DELAY,
+    ):
         self.max_retries = max_retries
         self.base_delay = base_delay
 
@@ -262,7 +272,7 @@ class RetryManager:
 class ConcurrentToolExecutor:
     """Manages concurrent execution of independent tools."""
 
-    def __init__(self, max_concurrent: int = 5):
+    def __init__(self, max_concurrent: int = DEFAULT_MAX_CONCURRENT):
         self.max_concurrent = max_concurrent
         self.semaphore = asyncio.Semaphore(max_concurrent)
         self.active_tasks: Set[str] = set()
@@ -424,7 +434,9 @@ class ConcurrentToolExecutor:
 class AdvancedOrchestrator:
     """Advanced orchestrator with all improvements integrated."""
 
-    def __init__(self, tool_registry: ToolRegistry, max_concurrent: int = 5):
+    def __init__(
+        self, tool_registry: ToolRegistry, max_concurrent: int = DEFAULT_MAX_CONCURRENT
+    ):
         self.tool_registry = tool_registry
         self.command_queue = CommandQueue()
         self.side_effect_broker = SideEffectBroker()
@@ -478,7 +490,7 @@ class AdvancedOrchestrator:
             if task_id in self.command_queue.completed_tasks:
                 return self.command_queue.completed_tasks[task_id].result
 
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(TASK_POLLING_INTERVAL)
 
         return None
 
@@ -528,11 +540,11 @@ class AdvancedOrchestrator:
                     await self.command_queue.mark_completed(task.task_id, result)
                 else:
                     # No tasks available, wait a bit
-                    await asyncio.sleep(0.1)
+                    await asyncio.sleep(TASK_POLLING_INTERVAL)
 
             except Exception as e:
                 logging.error(f"Worker loop error: {e}")
-                await asyncio.sleep(1.0)
+                await asyncio.sleep(ERROR_RECOVERY_DELAY)
 
     async def execute_tool_with_context(
         self,

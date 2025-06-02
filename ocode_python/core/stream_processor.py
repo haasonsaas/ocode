@@ -16,6 +16,9 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Set
 from ..tools.base import ToolResult
 from .context_manager import ContextManager
 
+# Constants for stream processing behavior
+MAX_HISTORY_SIZE = 50
+
 
 @dataclass
 class Operation:
@@ -193,11 +196,10 @@ class StreamProcessor:
         self._write_lock = asyncio.Lock()
 
         # Initialize predictive engine if enabled
-        self.predictive_engine: Optional["PredictiveEngine"]
         if enable_predictive:
-            self.predictive_engine = PredictiveEngine(self)
+            self.predictive_engine: Optional[PredictiveEngine] = PredictiveEngine(self)
         else:
-            self.predictive_engine = None
+            self.predictive_engine: Optional[PredictiveEngine] = None
 
     async def process_pipeline(
         self, operations: List[Operation]
@@ -554,9 +556,9 @@ class PredictiveEngine:
         """Record tool execution for pattern learning."""
         self.execution_history.append(tool_name)
 
-        # Keep history manageable - maintain exactly 50 items max
-        if len(self.execution_history) > 50:
-            self.execution_history = self.execution_history[-50:]
+        # Keep history manageable - maintain exactly MAX_HISTORY_SIZE items max
+        if len(self.execution_history) > MAX_HISTORY_SIZE:
+            self.execution_history = self.execution_history[-MAX_HISTORY_SIZE:]
 
     async def cleanup(self) -> None:
         """Clean up any running cache warming tasks."""
