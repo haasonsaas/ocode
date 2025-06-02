@@ -14,7 +14,7 @@ try:
     REQUESTS_AVAILABLE = True
 except ImportError:
     # Fallback for environments where requests is not available
-    requests = None
+    requests = None  # type: ignore
     REQUESTS_AVAILABLE = False
 
 
