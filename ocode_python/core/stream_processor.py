@@ -196,10 +196,11 @@ class StreamProcessor:
         self._write_lock = asyncio.Lock()
 
         # Initialize predictive engine if enabled
+        self.predictive_engine: Optional[PredictiveEngine]
         if enable_predictive:
-            self.predictive_engine: Optional[PredictiveEngine] = PredictiveEngine(self)
+            self.predictive_engine = PredictiveEngine(self)
         else:
-            self.predictive_engine: Optional[PredictiveEngine] = None
+            self.predictive_engine = None
 
     async def process_pipeline(
         self, operations: List[Operation]
