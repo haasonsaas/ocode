@@ -192,8 +192,9 @@ class StreamProcessor:
         self.context_batcher = ContextBatcher(context_manager)
         self.operation_results: Dict[str, OperationResult] = {}
         self.read_cache: Dict[str, Any] = {}
-        self._read_lock = asyncio.Lock()
-        self._write_lock = asyncio.Lock()
+        self._read_lock: Optional[asyncio.Lock] = None
+        self._write_lock: Optional[asyncio.Lock] = None
+        self._locks_initialized = False
 
         # Initialize predictive engine if enabled
         self.predictive_engine: Optional[PredictiveEngine]
@@ -201,6 +202,13 @@ class StreamProcessor:
             self.predictive_engine = PredictiveEngine(self)
         else:
             self.predictive_engine = None
+
+    async def _ensure_locks_initialized(self) -> None:
+        """Ensure locks are initialized with an active event loop."""
+        if not self._locks_initialized:
+            self._read_lock = asyncio.Lock()
+            self._write_lock = asyncio.Lock()
+            self._locks_initialized = True
 
     async def process_pipeline(
         self, operations: List[Operation]
@@ -329,7 +337,8 @@ class StreamProcessor:
 
     async def _execute_read_operation(self, operation: Operation) -> ToolResult:
         """Execute a read operation with caching."""
-        async with self._read_lock:
+        await self._ensure_locks_initialized()
+        async with self._read_lock:  # type: ignore[union-attr]
             cache_key = f"{operation.tool_name}:{hash(str(operation.arguments))}"
 
             if cache_key in self.read_cache:
@@ -353,7 +362,8 @@ class StreamProcessor:
 
     async def _execute_write_operation(self, operation: Operation) -> ToolResult:
         """Execute a write operation (sequential to avoid conflicts)."""
-        async with self._write_lock:
+        await self._ensure_locks_initialized()
+        async with self._write_lock:  # type: ignore[union-attr]
             from ..tools.base import ToolRegistry
 
             registry = ToolRegistry()

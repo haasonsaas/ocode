@@ -31,21 +31,31 @@ class ProcessManager:
 
     def __init__(self):
         self.active_processes = set()
-        self._cleanup_lock = asyncio.Lock()
+        self._cleanup_lock: Optional[asyncio.Lock] = None
+        self._lock_initialized = False
+
+    async def _ensure_lock_initialized(self) -> None:
+        """Ensure lock is initialized with an active event loop."""
+        if not self._lock_initialized:
+            self._cleanup_lock = asyncio.Lock()
+            self._lock_initialized = True
 
     async def register_process(self, process):
         """Register a process for tracking."""
-        async with self._cleanup_lock:
+        await self._ensure_lock_initialized()
+        async with self._cleanup_lock:  # type: ignore[union-attr]
             self.active_processes.add(process)
 
     async def unregister_process(self, process):
         """Unregister a process from tracking."""
-        async with self._cleanup_lock:
+        await self._ensure_lock_initialized()
+        async with self._cleanup_lock:  # type: ignore[union-attr]
             self.active_processes.discard(process)
 
     async def cleanup_all(self):
         """Cleanup all active processes."""
-        async with self._cleanup_lock:
+        await self._ensure_lock_initialized()
+        async with self._cleanup_lock:  # type: ignore[union-attr]
             for process in list(self.active_processes):
                 await self._terminate_process(process)
             self.active_processes.clear()
@@ -830,6 +840,7 @@ class ScriptTool(Tool):
                         # Use cmd or find bash on Windows
                         bash_path = shutil.which("bash") or shutil.which("git-bash")
                         if bash_path:
+                            # Use shell=True to handle paths with spaces on Windows
                             cmd = [bash_path, script_file.name]
                         else:
                             # Fallback to cmd reading the script

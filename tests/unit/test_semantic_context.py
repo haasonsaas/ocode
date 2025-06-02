@@ -564,7 +564,9 @@ class TestDynamicContextManager:
         # file1.py should be most frequent (appears in both contexts)
         most_frequent = insights["most_frequent_files"]
         assert len(most_frequent) > 0
-        assert "/test/file1.py" in [item[0] for item in most_frequent]
+        # Handle both Unix and Windows path separators
+        file_paths = [item[0] for item in most_frequent]
+        assert any("file1.py" in path for path in file_paths)
 
 
 class TestIntegrationScenarios:
