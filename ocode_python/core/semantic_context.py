@@ -287,7 +287,7 @@ class SemanticContextBuilder:
             await self._compute_keyword_scores(query, semantic_files)
 
     async def _process_embedding_batch(
-        self, query_embedding: np.ndarray, batch: List[SemanticFile]
+        self, query_embedding: Any, batch: List[SemanticFile]
     ) -> None:
         """Process a batch of files for embeddings."""
         texts_to_encode = []
