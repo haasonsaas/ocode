@@ -3,6 +3,7 @@ Tests for semantic context selection and dynamic context management.
 """
 
 import asyncio
+import os
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -309,6 +310,12 @@ import '../utils/helper';
     @pytest.mark.asyncio
     @pytest.mark.skipif(
         not EMBEDDINGS_AVAILABLE, reason="Sentence transformers not available"
+    )
+    @pytest.mark.skipif(
+        bool(
+            os.getenv("CI") or os.getenv("GITHUB_ACTIONS") or os.getenv("JENKINS_URL")
+        ),
+        reason="Skip embeddings test in CI to prevent segfaults",
     )
     async def test_semantic_scoring_with_embeddings(
         self, semantic_builder, sample_files
