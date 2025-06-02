@@ -865,18 +865,28 @@ class ScriptTool(Tool):
                     else:
                         cmd = [shutil.which("sh") or "sh", script_file.name]
 
-                # Execute script using BashTool
-                bash_tool = BashTool()
-                command_str = " ".join(shlex.quote(arg) for arg in cmd)
-
-                result = await bash_tool.execute(
-                    command=command_str,
-                    working_dir=str(work_dir),
-                    timeout=timeout,
-                    env_vars=env_vars,
-                    safe_mode=False,  # Scripts are created by us
-                    show_command=True,
-                )
+                # Execute script using appropriate method for platform
+                if (
+                    platform.system() == "Windows"
+                    and script_type == "bash"
+                    and len(cmd) >= 2
+                ):
+                    # On Windows with bash, execute directly to avoid quoting issues
+                    result = await self._execute_script_directly(
+                        cmd, work_dir, timeout, env_vars
+                    )
+                else:
+                    # Use BashTool for other cases
+                    bash_tool = BashTool()
+                    command_str = self._build_cross_platform_command(cmd)
+                    result = await bash_tool.execute(
+                        command=command_str,
+                        working_dir=str(work_dir),
+                        timeout=timeout,
+                        env_vars=env_vars,
+                        safe_mode=False,  # Scripts are created by us
+                        show_command=True,
+                    )
 
                 # Add script info to metadata
                 if result.metadata:
@@ -901,3 +911,90 @@ class ScriptTool(Tool):
             return ToolResult(
                 success=False, output="", error=f"Script execution failed: {str(e)}"
             )
+
+    async def _execute_script_directly(
+        self, cmd: List[str], work_dir: Path, timeout: int, env_vars: dict
+    ) -> ToolResult:
+        """Execute script directly without going through cmd.exe on Windows."""
+        import asyncio
+        import time
+
+        start_time = time.time()
+
+        try:
+            # Prepare environment
+            env = os.environ.copy()
+            if env_vars:
+                env.update(env_vars)
+
+            # Execute directly using asyncio.create_subprocess_exec
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                cwd=str(work_dir),
+                env=env,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+
+            try:
+                stdout, stderr = await asyncio.wait_for(
+                    process.communicate(), timeout=timeout if timeout > 0 else None
+                )
+
+                stdout_str = stdout.decode("utf-8", errors="replace") if stdout else ""
+                stderr_str = stderr.decode("utf-8", errors="replace") if stderr else ""
+
+                execution_time = time.time() - start_time
+
+                # Format output similar to BashTool
+                output_lines = [f"$ {' '.join(cmd)}", ""]
+                if stdout_str:
+                    output_lines.append(stdout_str.rstrip())
+
+                success = process.returncode == 0
+
+                return ToolResult(
+                    success=success,
+                    output="\n".join(output_lines).rstrip() if success else stdout_str,
+                    error=stderr_str if not success else "",
+                    metadata={
+                        "command": " ".join(cmd),
+                        "working_dir": str(work_dir),
+                        "return_code": process.returncode,
+                        "execution_time": execution_time,
+                    },
+                )
+
+            except asyncio.TimeoutError:
+                process.kill()
+                return ToolResult(
+                    success=False,
+                    output="",
+                    error=f"Script timed out after {timeout} seconds",
+                    metadata={"command": " ".join(cmd), "return_code": -15},
+                )
+
+        except Exception as e:
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"Script execution failed: {str(e)}",
+                metadata={"command": " ".join(cmd)},
+            )
+
+    def _build_cross_platform_command(self, cmd: List[str]) -> str:
+        """Build a command string that works on both Windows and Unix."""
+        import platform
+
+        if platform.system() == "Windows":
+            # On Windows, use double quotes for paths with spaces
+            quoted_args = []
+            for arg in cmd:
+                if " " in arg and not (arg.startswith('"') and arg.endswith('"')):
+                    quoted_args.append(f'"{arg}"')
+                else:
+                    quoted_args.append(arg)
+            return " ".join(quoted_args)
+        else:
+            # On Unix, use shlex.quote for proper escaping
+            return " ".join(shlex.quote(arg) for arg in cmd)
