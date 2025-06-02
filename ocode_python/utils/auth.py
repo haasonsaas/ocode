@@ -8,7 +8,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-import requests
+try:
+    import requests
+
+    REQUESTS_AVAILABLE = True
+except ImportError:
+    # Fallback for environments where requests is not available
+    requests = None
+    REQUESTS_AVAILABLE = False
 
 
 @dataclass
@@ -251,6 +258,9 @@ class AuthenticationManager:
         Returns:
             True if refreshed successfully
         """
+        if not REQUESTS_AVAILABLE:
+            return False
+
         # Get stored credentials
         credentials = self.get_credentials()
         refresh_token = credentials.get("refresh_token")

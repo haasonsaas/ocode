@@ -7,7 +7,14 @@ import platform
 from datetime import datetime
 from typing import Any, Dict, List
 
-import psutil
+try:
+    import psutil
+
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    # Fallback for environments where psutil is not available
+    psutil = None
+    PSUTIL_AVAILABLE = False
 
 from ..utils.timeout_handler import TimeoutError, with_timeout
 from .base import (
@@ -87,6 +94,13 @@ class ProcessMonitorTool(Tool):
 
     async def execute(self, **kwargs: Any) -> ToolResult:
         """Execute process monitoring operations."""
+        if not PSUTIL_AVAILABLE:
+            return ToolResult(
+                success=False,
+                output="",
+                error="Process monitoring not available (psutil not installed)",
+            )
+
         action = kwargs.get("action", "").lower()
         name = kwargs.get("name")
         pid = kwargs.get("pid")

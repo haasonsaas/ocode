@@ -13,7 +13,14 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import pexpect
+try:
+    import pexpect
+
+    PEXPECT_AVAILABLE = True
+except ImportError:
+    # Fallback for environments where pexpect is not available (e.g., Windows)
+    pexpect = None
+    PEXPECT_AVAILABLE = False
 
 from ..utils import command_sanitizer, path_validator
 from .base import Tool, ToolDefinition, ToolParameter, ToolResult
@@ -256,11 +263,17 @@ class BashTool(Tool):
                 output_lines.append("")
 
             # Execute command
-            if interactive:
+            if interactive and PEXPECT_AVAILABLE:
                 result = await self._execute_interactive(
                     shell_cmd, work_dir or Path("."), env, timeout, input_data
                 )
             else:
+                # Fall back to standard execution if pexpect unavailable
+                if interactive and not PEXPECT_AVAILABLE:
+                    if show_command:  # Use show_command instead of undefined verbose
+                        output_lines.append(
+                            "⚠️  Interactive mode unavailable, using standard execution"
+                        )
                 result = await self._execute_standard(
                     shell_cmd,
                     work_dir or Path("."),
@@ -549,6 +562,8 @@ class BashTool(Tool):
 
     def _expect_eof_safe(self, child):
         """Safely expect EOF from pexpect child process."""
+        if not PEXPECT_AVAILABLE:
+            return
         try:
             child.expect(pexpect.EOF)
         except pexpect.TIMEOUT:
@@ -570,6 +585,11 @@ class BashTool(Tool):
         input_data: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Execute command in interactive mode using pexpect with improved handling."""
+        if not PEXPECT_AVAILABLE:
+            # Fallback to standard execution if pexpect is not available
+            return await self._execute_standard(
+                shell_cmd, work_dir, env, timeout, True, input_data
+            )
         output_buffer = io.StringIO()
         child = None
         start_time = time.time()
@@ -641,26 +661,28 @@ class BashTool(Tool):
                 "execution_time": time.time() - start_time,
             }
 
-        except pexpect.TIMEOUT:
-            if child:
-                child.terminate(force=True)
-            return {
-                "success": False,
-                "stdout": output_buffer.getvalue(),
-                "stderr": f"Interactive command timed out after {timeout} seconds",
-                "return_code": -1,
-                "execution_time": time.time() - start_time,
-            }
         except Exception as e:
+            # Handle pexpect.TIMEOUT if available, otherwise general Exception
+            is_timeout = PEXPECT_AVAILABLE and isinstance(e, pexpect.TIMEOUT)
             if child:
-                try:
+                if is_timeout:
                     child.terminate(force=True)
-                except Exception:  # nosec
-                    pass
+                else:
+                    try:
+                        child.terminate(force=True)
+                    except Exception:  # nosec
+                        pass
+
+            # Return appropriate error message
+            error_msg = (
+                f"Interactive command timed out after {timeout} seconds"
+                if is_timeout
+                else str(e)
+            )
             return {
                 "success": False,
                 "stdout": output_buffer.getvalue(),
-                "stderr": str(e),
+                "stderr": error_msg,
                 "return_code": -1,
                 "execution_time": time.time() - start_time,
             }

@@ -8,8 +8,17 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 import yaml
-from jsonpath_ng import parse as jsonpath_parse
-from jsonpath_ng.exceptions import JsonPathParserError
+
+try:
+    from jsonpath_ng import parse as jsonpath_parse
+    from jsonpath_ng.exceptions import JsonPathParserError
+
+    JSONPATH_AVAILABLE = True
+except ImportError:
+    # Fallback for environments where jsonpath_ng is not available
+    jsonpath_parse = None
+    JsonPathParserError = Exception
+    JSONPATH_AVAILABLE = False
 
 from ..utils import path_validator
 from ..utils.timeout_handler import async_timeout
@@ -252,6 +261,12 @@ class JsonYamlTool(Tool):
 
     async def _action_query(self, data: Any, query: str) -> ToolResult:
         """Query data using JSONPath."""
+        if not JSONPATH_AVAILABLE:
+            return ToolResult(
+                success=False,
+                output="",
+                error="JSONPath not available (jsonpath-ng not installed)",
+            )
         try:
             jsonpath_expr = jsonpath_parse(query)
             matches = jsonpath_expr.find(data)
@@ -294,6 +309,12 @@ class JsonYamlTool(Tool):
         pretty: bool,
     ) -> ToolResult:
         """Set a value at the specified path."""
+        if not JSONPATH_AVAILABLE:
+            return ToolResult(
+                success=False,
+                output="",
+                error="JSONPath not available (jsonpath-ng not installed)",
+            )
         try:
             # Parse the value as JSON
             try:
