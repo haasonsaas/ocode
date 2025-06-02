@@ -341,7 +341,13 @@ class BashTool(Tool):
                 # Use PowerShell if requested and available
                 powershell_path = shutil.which("pwsh") or shutil.which("powershell")
                 if powershell_path:
-                    return [powershell_path, "-Command", command]
+                    return [
+                        powershell_path,
+                        "-ExecutionPolicy",
+                        "Bypass",
+                        "-Command",
+                        f"& {{{command}}}",
+                    ]
 
             # Default to cmd.exe on Windows
             cmd_path = shutil.which("cmd") or "cmd.exe"
