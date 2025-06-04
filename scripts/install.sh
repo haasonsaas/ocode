@@ -76,7 +76,7 @@ fi
 # Ask about virtual environment
 echo ""
 read -p "Do you want to install in a virtual environment? (recommended) [Y/n]: " -n 1 -r
-echo
+echo ""
 if [[ $REPLY =~ ^[Nn]$ ]]; then
     USE_VENV=false
     print_warning "Installing globally without virtual environment"
