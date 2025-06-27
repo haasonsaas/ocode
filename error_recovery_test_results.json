@@ -1,0 +1,106 @@
+{
+  "summary": {
+    "tests_run": 13,
+    "tests_passed": 13,
+    "tests_failed": 0,
+    "success_rate": 100.0
+  },
+  "performance_metrics": {
+    "Analyze permission failure": {
+      "analysis_time": 0.0010371208190917969,
+      "strategy_count": 1
+    },
+    "Analyze network failure": {
+      "analysis_time": 0.0004439353942871094,
+      "strategy_count": 1
+    },
+    "Analyze dependency failure": {
+      "analysis_time": 0.0004680156707763672,
+      "strategy_count": 1
+    },
+    "Analyze resource failure": {
+      "analysis_time": 0.00043392181396484375,
+      "strategy_count": 1
+    },
+    "Parameter adjustment recovery": {
+      "recovery_time": 0.0008580684661865234,
+      "stats": {
+        "attempts": 1,
+        "successes": 0,
+        "failures": 1,
+        "strategy_usage": {
+          "parameter_adjustment": 1
+        },
+        "success_rate": 0.0,
+        "most_used_strategies": [
+          [
+            "parameter_adjustment",
+            1
+          ]
+        ]
+      }
+    },
+    "Orchestrator error recovery integration": {
+      "execution_time": 0.0008738040924072266,
+      "recovery_stats": {
+        "attempts": 1,
+        "successes": 0,
+        "failures": 1,
+        "strategy_usage": {
+          "parameter_adjustment": 1
+        },
+        "success_rate": 0.0,
+        "most_used_strategies": [
+          [
+            "parameter_adjustment",
+            1
+          ]
+        ]
+      }
+    },
+    "File not found scenario": {
+      "execution_time": 0.0010159015655517578,
+      "result_success": false
+    },
+    "Invalid command scenario": {
+      "execution_time": 0.010798215866088867,
+      "result_success": false
+    },
+    "Rapid successive failures": {
+      "execution_time": 7.004118919372559,
+      "recovery_stats": {
+        "attempts": 1,
+        "successes": 0,
+        "failures": 1,
+        "strategy_usage": {
+          "parameter_adjustment": 1
+        },
+        "success_rate": 0.0,
+        "most_used_strategies": [
+          [
+            "parameter_adjustment",
+            1
+          ]
+        ]
+      }
+    },
+    "Recovery metrics collection": {
+      "final_stats": {
+        "attempts": 3,
+        "successes": 0,
+        "failures": 3,
+        "strategy_usage": {
+          "parameter_adjustment": 3
+        },
+        "success_rate": 0.0,
+        "most_used_strategies": [
+          [
+            "parameter_adjustment",
+            3
+          ]
+        ]
+      }
+    }
+  },
+  "failures": []
+}

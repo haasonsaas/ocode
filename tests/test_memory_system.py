@@ -262,6 +262,10 @@ class TestMemoryExamples(unittest.TestCase):
         self.test_dir = tempfile.mkdtemp()
         self.original_cwd = os.getcwd()
         os.chdir(self.test_dir)
+        
+        # Create .ocode directory structure
+        self.memory_dir = Path(self.test_dir) / ".ocode" / "memory"
+        self.memory_dir.mkdir(parents=True, exist_ok=True)
 
     def tearDown(self):
         """Clean up test environment."""

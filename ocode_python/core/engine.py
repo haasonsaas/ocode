@@ -1305,7 +1305,7 @@ When a user asks you to perform an action, call the appropriate function."""
                 # Heuristic gave definitive answer
                 if self.verbose:
                     decision = "Use tools" if heuristic_result else "Knowledge response"
-                print(f"⚡ Heuristic decision: {decision}")
+                    print(f"⚡ Heuristic decision: {decision}")
 
                 # Create analysis result matching LLM format
                 llm_analysis = {

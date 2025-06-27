@@ -67,17 +67,25 @@ class TestCLIIntegration:
         mock_engine.return_value = mock_engine_instance
 
         runner = CliRunner()
-        result = runner.invoke(cli, ["-p", "Hello, world!"])
+        
+        # Create a config file to avoid onboarding prompt
+        with runner.isolated_filesystem():
+            config_dir = Path.home() / ".ocode"
+            config_dir.mkdir(exist_ok=True)
+            config_file = config_dir / "config.json"
+            config_file.write_text('{"model": "test"}')
+            
+            result = runner.invoke(cli, ["-p", "Hello, world!"])
 
-        # Check exit code - should be 0 for successful completion
-        if result.exit_code != 0:
-            print(f"Exit code: {result.exit_code}")
-            print(f"Output: {result.output}")
-            if result.exception:
-                print(f"Exception: {result.exception}")
+            # Check exit code - should be 0 for successful completion
+            if result.exit_code != 0:
+                print(f"Exit code: {result.exit_code}")
+                print(f"Output: {result.output}")
+                if result.exception:
+                    print(f"Exception: {result.exception}")
 
-        assert result.exit_code == 0
-        assert "This is a test response." in result.output
+            assert result.exit_code == 0
+            assert "This is a test response." in result.output
 
     def test_cli_init_command(self, temp_dir: Path):
         """Test CLI init command."""

@@ -66,6 +66,10 @@ def safe_file_read(
         else:
             original = e
 
+        # If it's already a FileSystemError, just re-raise it
+        if isinstance(original, FileSystemError):
+            raise original
+        
         raise create_error_from_exception(
             original,
             "file_read",
@@ -149,6 +153,10 @@ def safe_file_write(
         else:
             original = e
 
+        # If it's already a StructuredError, just re-raise it
+        if isinstance(original, FileSystemError):
+            raise original
+        
         raise create_error_from_exception(
             original,
             "file_write",
@@ -207,6 +215,10 @@ def safe_file_copy(
         else:
             original = e
 
+        # If it's already a StructuredError, just re-raise it
+        if isinstance(original, FileSystemError):
+            raise original
+        
         raise create_error_from_exception(
             original,
             "file_copy",
@@ -264,6 +276,10 @@ def safe_file_move(
         else:
             original = e
 
+        # If it's already a StructuredError, just re-raise it
+        if isinstance(original, FileSystemError):
+            raise original
+        
         raise create_error_from_exception(
             original,
             "file_move",
@@ -326,6 +342,10 @@ def safe_file_delete(
         else:
             original = e
 
+        # If it's already a StructuredError, just re-raise it
+        if isinstance(original, FileSystemError):
+            raise original
+        
         raise create_error_from_exception(
             original,
             "file_delete",
@@ -379,6 +399,10 @@ def safe_directory_create(
         else:
             original = e
 
+        # If it's already a StructuredError, just re-raise it
+        if isinstance(original, FileSystemError):
+            raise original
+        
         raise create_error_from_exception(
             original,
             "directory_create",
@@ -431,6 +455,10 @@ async def safe_file_read_async(
         else:
             original = e
 
+        # If it's already a StructuredError, just re-raise it
+        if isinstance(original, FileSystemError):
+            raise original
+        
         raise create_error_from_exception(
             original,
             "file_read_async",
@@ -483,6 +511,10 @@ async def safe_file_write_async(
         else:
             original = e
 
+        # If it's already a StructuredError, just re-raise it
+        if isinstance(original, FileSystemError):
+            raise original
+        
         raise create_error_from_exception(
             original,
             "file_write_async",

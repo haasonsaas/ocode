@@ -5,6 +5,7 @@ This module provides a hierarchy of structured error classes that standardize
 error handling across all tools and provide rich context for debugging.
 """
 
+import builtins
 import traceback
 from datetime import datetime
 from enum import Enum
@@ -409,6 +410,10 @@ def create_error_from_exception(
     Returns:
         Appropriate StructuredError subclass
     """
+    # If it's already a StructuredError, just return it
+    if isinstance(exc, StructuredError):
+        return exc
+    
     context = ErrorContext(
         operation=operation, component=component, details=additional_context or {}
     )
@@ -423,10 +428,21 @@ def create_error_from_exception(
             original_error=exc,
         )
 
-    elif isinstance(exc, PermissionError):
-        return PermissionError(
+    elif isinstance(exc, builtins.PermissionError):
+        # Return FileSystemError for permission issues as tests expect this
+        return FileSystemError(
             f"Permission denied: {exc}",
-            resource_path=str(getattr(exc, 'filename', None)) if getattr(exc, 'filename', None) else None,
+            file_path=str(getattr(exc, 'filename', None)) if getattr(exc, 'filename', None) else None,
+            operation_type="access",
+            context=context,
+            original_error=exc,
+        )
+    
+    elif isinstance(exc, FileExistsError):
+        return FileSystemError(
+            f"File exists: {exc}",
+            file_path=str(exc.filename) if exc.filename else None,
+            operation_type="create",
             context=context,
             original_error=exc,
         )
