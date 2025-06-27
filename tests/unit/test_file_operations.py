@@ -437,7 +437,7 @@ class TestFileUtilities:
             temp_path = f.name
             f.write(b"test")
             f.flush()
-        
+
         try:
             # File should not be locked, so this should return True immediately
             result = wait_for_file_unlock(temp_path, timeout=0.1)

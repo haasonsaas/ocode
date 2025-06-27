@@ -178,8 +178,8 @@ class TestAtomicWrite:
         # Windows and Unix have different error messages for directory write
         error_lower = error.lower()
         assert (
-            "is a directory" in error 
-            or "directory" in error_lower 
+            "is a directory" in error
+            or "directory" in error_lower
             or "permission denied" in error_lower
             or "access is denied" in error_lower
         )
