@@ -183,6 +183,7 @@ async def managed_subprocess(
             if isinstance(cmd, str):
                 # Split string command for exec
                 import shlex
+
                 cmd_list = shlex.split(cmd)
             else:
                 cmd_list = cmd

@@ -111,7 +111,9 @@ class MigrationShellCommandTool(EnhancedShellCommandTool):
 
         return mapped
 
-    def _map_result_format(self, result: ToolResult, kwargs: Dict[str, Any]) -> ToolResult:
+    def _map_result_format(
+        self, result: ToolResult, kwargs: Dict[str, Any]
+    ) -> ToolResult:
         """
         Map enhanced result format to legacy format if needed.
 
