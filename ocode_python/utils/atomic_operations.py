@@ -71,7 +71,7 @@ class AtomicFileWriter:
         # Ensure attributes are set for type checker
         assert self.temp_file is not None
         assert self.temp_path is not None
-        
+
         return self.temp_file
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
@@ -105,7 +105,7 @@ class AtomicFileWriter:
         # No exception, perform atomic replacement
         # temp_path should be set by __enter__
         assert self.temp_path is not None
-        
+
         try:
             # Create backup if requested and target exists
             if self.backup and self.target_path.exists():
@@ -211,10 +211,10 @@ def atomic_write(
 
 
 def safe_file_update(
-    path: Union[str, Path], 
-    update_func: Callable[[str], str], 
-    encoding: str = "utf-8", 
-    backup: bool = True
+    path: Union[str, Path],
+    update_func: Callable[[str], str],
+    encoding: str = "utf-8",
+    backup: bool = True,
 ) -> Tuple[bool, Optional[str]]:
     """Safely update a file by reading, transforming, and atomically writing.
 
