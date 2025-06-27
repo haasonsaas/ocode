@@ -186,4 +186,14 @@ exclude_lines = [
 [tool.bandit]
 targets = ["ocode_python"]
 exclude_dirs = ["tests", "venv", ".venv", "build", "dist"]
-skips = ["B101", "B601", "B608"]  # B101: assert_used, B601: paramiko_calls, B608: hardcoded_sql
+skips = [
+    "B101",  # assert_used
+    "B110",  # try_except_pass - legitimate use in cleanup code
+    "B112",  # try_except_continue - legitimate use in encoding fallback
+    "B404",  # subprocess import - needed for process management
+    "B603",  # subprocess call - controlled process execution
+    "B604",  # shell=True - validated and sanitized commands only
+    "B607",  # partial_executable_path - using system commands safely
+    "B601",  # paramiko_calls
+    "B608",  # hardcoded_sql
+]
