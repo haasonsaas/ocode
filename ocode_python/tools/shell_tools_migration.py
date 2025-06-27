@@ -218,9 +218,7 @@ class ShellToolsMigrationHelper:
         )
 
         # Replace class instantiation
-        migrated = migrated.replace(
-            "ShellCommandTool()", "EnhancedShellCommandTool()"
-        )
+        migrated = migrated.replace("ShellCommandTool()", "EnhancedShellCommandTool()")
 
         # Add migration comment
         if "EnhancedShellCommandTool" in migrated and "# Migrated from" not in migrated:
