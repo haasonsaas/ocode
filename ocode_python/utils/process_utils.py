@@ -18,7 +18,7 @@ try:
     RESOURCE_AVAILABLE = True
 except ImportError:
     # Windows doesn't have resource module
-    resource = None
+    resource = None  # type: ignore
     RESOURCE_AVAILABLE = False
 
 
@@ -173,9 +173,20 @@ async def managed_subprocess(
 
         # Create subprocess
         if shell:
-            process = await asyncio.create_subprocess_shell(cmd, **kwargs)
+            if isinstance(cmd, list):
+                # Join command parts for shell execution
+                shell_cmd = " ".join(cmd)
+            else:
+                shell_cmd = cmd
+            process = await asyncio.create_subprocess_shell(shell_cmd, **kwargs)
         else:
-            process = await asyncio.create_subprocess_exec(*cmd, **kwargs)
+            if isinstance(cmd, str):
+                # Split string command for exec
+                import shlex
+                cmd_list = shlex.split(cmd)
+            else:
+                cmd_list = cmd
+            process = await asyncio.create_subprocess_exec(*cmd_list, **kwargs)
 
         # Yield the process
         yield process

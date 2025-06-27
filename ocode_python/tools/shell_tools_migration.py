@@ -7,7 +7,7 @@ the enhanced version with process management.
 """
 
 import warnings
-from typing import Any
+from typing import Any, Dict, List
 
 from .base import ToolResult
 from .shell_tools import ShellCommandTool
@@ -70,7 +70,7 @@ class MigrationShellCommandTool(EnhancedShellCommandTool):
         # Map result format if needed for compatibility
         return self._map_result_format(result, kwargs)
 
-    def _should_use_legacy(self, kwargs: dict) -> bool:
+    def _should_use_legacy(self, kwargs: Dict[str, Any]) -> bool:
         """
         Determine if legacy implementation should be used.
 
@@ -83,7 +83,7 @@ class MigrationShellCommandTool(EnhancedShellCommandTool):
         command = kwargs.get("command", "")
 
         # List of patterns that might need legacy behavior
-        legacy_patterns: list[str] = [
+        legacy_patterns: List[str] = [
             # Add specific commands that need legacy behavior
             # Example: "special_legacy_command",
         ]
@@ -94,7 +94,7 @@ class MigrationShellCommandTool(EnhancedShellCommandTool):
 
         return False
 
-    def _map_legacy_params(self, kwargs: dict) -> dict:
+    def _map_legacy_params(self, kwargs: Dict[str, Any]) -> Dict[str, Any]:
         """Map legacy parameter names/values to new ones."""
         mapped = kwargs.copy()
 
@@ -111,7 +111,7 @@ class MigrationShellCommandTool(EnhancedShellCommandTool):
 
         return mapped
 
-    def _map_result_format(self, result: ToolResult, kwargs: dict) -> ToolResult:
+    def _map_result_format(self, result: ToolResult, kwargs: Dict[str, Any]) -> ToolResult:
         """
         Map enhanced result format to legacy format if needed.
 
@@ -131,7 +131,7 @@ class ShellToolsMigrationHelper:
     """Helper class for migrating shell tools usage."""
 
     @staticmethod
-    def analyze_usage(code: str) -> dict:
+    def analyze_usage(code: str) -> Dict[str, Any]:
         """
         Analyze code for ShellCommandTool usage patterns.
 
@@ -141,7 +141,7 @@ class ShellToolsMigrationHelper:
         Returns:
             Dictionary with migration suggestions
         """
-        suggestions = {
+        suggestions: Dict[str, Any] = {
             "uses_shell_command_tool": False,
             "uses_timeout": False,
             "uses_working_dir": False,
@@ -149,6 +149,7 @@ class ShellToolsMigrationHelper:
             "migration_complexity": "low",
             "suggestions": [],
         }
+        suggestion_list = suggestions["suggestions"]  # type: List[str]
 
         if "ShellCommandTool" in code:
             suggestions["uses_shell_command_tool"] = True
@@ -164,22 +165,22 @@ class ShellToolsMigrationHelper:
 
         # Add migration suggestions
         if suggestions["uses_shell_command_tool"]:
-            suggestions["suggestions"].append(
+            suggestion_list.append(
                 "Replace 'from ocode_python.tools.shell_tools import "
                 "ShellCommandTool' with 'from ocode_python.tools.shell_tools_enhanced "
                 "import EnhancedShellCommandTool'"
             )
 
-            suggestions["suggestions"].append(
+            suggestion_list.append(
                 "Consider using new features: max_output_size, cpu_limit, memory_limit"
             )
 
         # Assess complexity
         feature_count = sum(
             [
-                suggestions["uses_timeout"],
-                suggestions["uses_working_dir"],
-                suggestions["uses_capture_output"],
+                bool(suggestions["uses_timeout"]),
+                bool(suggestions["uses_working_dir"]),
+                bool(suggestions["uses_capture_output"]),
             ]
         )
 

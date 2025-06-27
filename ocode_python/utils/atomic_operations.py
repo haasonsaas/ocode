@@ -8,7 +8,7 @@ data loss and corruption during write operations.
 import os
 import tempfile
 from pathlib import Path
-from typing import Optional, Tuple, Union
+from typing import Any, Callable, IO, Optional, Tuple, Union
 
 
 class AtomicFileWriter:
@@ -44,12 +44,12 @@ class AtomicFileWriter:
         self.encoding = encoding
         self.backup = backup
         self.sync = sync
-        self.temp_file = None
-        self.temp_path = None
-        self.backup_path = None
+        self.temp_file: Optional[IO[Any]] = None
+        self.temp_path: Optional[Path] = None
+        self.backup_path: Optional[Path] = None
         self._closed = False
 
-    def __enter__(self):
+    def __enter__(self) -> IO[Any]:
         """Enter context manager, create temporary file."""
         # Create temporary file in same directory as target
         # This ensures atomic rename on same filesystem
@@ -68,12 +68,16 @@ class AtomicFileWriter:
             os.close(temp_fd)  # Close the file descriptor
             self.temp_file = open(self.temp_path, self.mode, encoding=self.encoding)
 
+        # Ensure attributes are set for type checker
+        assert self.temp_file is not None
+        assert self.temp_path is not None
+        
         return self.temp_file
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Exit context manager, handle atomic replacement."""
         if self._closed:
-            return False
+            return
 
         self._closed = True
 
@@ -96,9 +100,12 @@ class AtomicFileWriter:
                     self.temp_path.unlink()
             except Exception:
                 pass  # Best effort cleanup
-            return False
+            return
 
         # No exception, perform atomic replacement
+        # temp_path should be set by __enter__
+        assert self.temp_path is not None
+        
         try:
             # Create backup if requested and target exists
             if self.backup and self.target_path.exists():
@@ -155,9 +162,7 @@ class AtomicFileWriter:
                 pass
             raise e
 
-        return False
-
-    def abort(self):
+    def abort(self) -> None:
         """Abort the write operation and clean up."""
         if not self._closed:
             self._closed = True
@@ -206,7 +211,10 @@ def atomic_write(
 
 
 def safe_file_update(
-    path: Union[str, Path], update_func, encoding: str = "utf-8", backup: bool = True
+    path: Union[str, Path], 
+    update_func: Callable[[str], str], 
+    encoding: str = "utf-8", 
+    backup: bool = True
 ) -> Tuple[bool, Optional[str]]:
     """Safely update a file by reading, transforming, and atomically writing.
 
