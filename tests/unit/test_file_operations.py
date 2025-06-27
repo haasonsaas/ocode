@@ -70,6 +70,12 @@ class TestSafeFileRead:
 
     def test_read_with_permission_error(self):
         """Test handling permission errors during read."""
+        import platform
+        
+        if platform.system() == "Windows":
+            # Skip this test on Windows as file permissions work differently
+            pytest.skip("File permission testing not reliable on Windows")
+            
         with tempfile.NamedTemporaryFile(delete=False) as f:
             temp_path = f.name
 
@@ -301,6 +307,12 @@ class TestSafeFileDelete:
 
     def test_delete_with_permission_error(self):
         """Test handling permission errors during deletion."""
+        import platform
+        
+        if platform.system() == "Windows":
+            # Skip this test on Windows as file permissions work differently
+            pytest.skip("File permission testing not reliable on Windows")
+            
         with tempfile.TemporaryDirectory() as temp_dir:
             file_path = Path(temp_dir) / "test_file.txt"
             file_path.write_text("test content")

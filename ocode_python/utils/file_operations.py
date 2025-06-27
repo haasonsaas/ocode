@@ -541,6 +541,9 @@ def is_file_locked(file_path: Union[str, Path]) -> bool:
         return False
     except (PermissionError, OSError):
         return True
+    except FileNotFoundError:
+        # File doesn't exist, so it can't be locked
+        return False
 
 
 def wait_for_file_unlock(
