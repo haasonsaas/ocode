@@ -27,7 +27,13 @@ class ExecutionTool(Tool):
                 ToolParameter(
                     name="framework",
                     type="string",
-                    description="Test framework to use (pytest, unittest)",
+                    description="Test framework to use (auto, pytest, unittest, jest, vitest, go, cargo, mocha, rspec, maven, gradle)",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="pattern",
+                    type="string",
+                    description="Test pattern or filter to run specific tests",
                     required=False,
                 ),
                 ToolParameter(
@@ -59,58 +65,144 @@ class ExecutionTool(Tool):
         return self._definition
 
     def _detect_test_framework(self, path: str) -> str:
-        """Auto-detect the appropriate test framework."""
+        """Auto-detect the appropriate test framework with enhanced detection."""
         test_path = Path(path)
 
-        # Check for specific test files and configs
-        if (test_path / "pytest.ini").exists() or (
-            test_path / "pyproject.toml"
-        ).exists():
-            return "pytest"
+        # Enhanced framework detection with priority order
+        frameworks_detected = []
 
+        # Python frameworks detection
+        if (test_path / "pytest.ini").exists():
+            frameworks_detected.append(("pytest", 10))
+        if (test_path / "tox.ini").exists():
+            frameworks_detected.append(("pytest", 8))
+        if (test_path / "setup.cfg").exists():
+            try:
+                with open(test_path / "setup.cfg") as f:
+                    content = f.read()
+                    if "[tool:pytest]" in content:
+                        frameworks_detected.append(("pytest", 9))
+            except Exception:  # nosec
+                pass
+
+        if (test_path / "pyproject.toml").exists():
+            try:
+                with open(test_path / "pyproject.toml") as f:
+                    content = f.read()
+                    if "[tool.pytest" in content:
+                        frameworks_detected.append(("pytest", 9))
+                    elif "pytest" in content:
+                        frameworks_detected.append(("pytest", 7))
+            except Exception:  # nosec
+                pass
+
+        # JavaScript/TypeScript frameworks
         if (test_path / "package.json").exists():
             try:
                 with open(test_path / "package.json") as f:
                     package_data = json.load(f)
-                    if "jest" in package_data.get("devDependencies", {}):
-                        return "jest"
+                    deps = {
+                        **package_data.get("dependencies", {}),
+                        **package_data.get("devDependencies", {}),
+                    }
+
+                    if "jest" in deps:
+                        frameworks_detected.append(("jest", 10))
+                    elif "vitest" in deps:
+                        frameworks_detected.append(("vitest", 10))
+                    elif "mocha" in deps:
+                        frameworks_detected.append(("mocha", 8))
+                    elif "karma" in deps:
+                        frameworks_detected.append(("karma", 6))
+
+                    # Check test scripts
+                    scripts = package_data.get("scripts", {})
+                    if "test" in scripts:
+                        script = scripts["test"]
+                        if "jest" in script:
+                            frameworks_detected.append(("jest", 9))
+                        elif "vitest" in script:
+                            frameworks_detected.append(("vitest", 9))
+                        elif "mocha" in script:
+                            frameworks_detected.append(("mocha", 7))
             except Exception:  # nosec
                 pass
 
+        # Go test detection
         if (test_path / "go.mod").exists():
-            return "go"
+            frameworks_detected.append(("go", 10))
 
-        # Check for Python test files
-        for file_path in test_path.rglob("test_*.py"):
-            return "pytest"
+        # Rust test detection
+        if (test_path / "Cargo.toml").exists():
+            frameworks_detected.append(("cargo", 10))
 
-        for file_path in test_path.rglob("*_test.py"):
-            return "pytest"
+        # Ruby test detection
+        if (test_path / "Gemfile").exists():
+            try:
+                with open(test_path / "Gemfile") as f:
+                    content = f.read()
+                    if "rspec" in content:
+                        frameworks_detected.append(("rspec", 9))
+                    elif "minitest" in content:
+                        frameworks_detected.append(("minitest", 8))
+            except Exception:  # nosec
+                pass
 
-        # Check for JavaScript test files
-        for file_path in test_path.rglob("*.test.js"):
-            return "jest"
+        # Java test detection
+        if (test_path / "pom.xml").exists():
+            frameworks_detected.append(("maven", 8))
+        if (test_path / "build.gradle").exists() or (
+            test_path / "build.gradle.kts"
+        ).exists():
+            frameworks_detected.append(("gradle", 8))
 
-        for file_path in test_path.rglob("*.spec.js"):
-            return "jest"
+        # File pattern-based detection
+        test_files = {
+            "pytest": list(test_path.rglob("test_*.py"))
+            + list(test_path.rglob("*_test.py")),
+            "jest": list(test_path.rglob("*.test.js"))
+            + list(test_path.rglob("*.spec.js"))
+            + list(test_path.rglob("*.test.ts"))
+            + list(test_path.rglob("*.spec.ts")),
+            "go": list(test_path.rglob("*_test.go")),
+            "cargo": list(test_path.rglob("**/tests/**/*.rs")),
+            "rspec": list(test_path.rglob("**/spec/**/*_spec.rb")),
+        }
 
-        # Check for Go test files
-        for file_path in test_path.rglob("*_test.go"):
-            return "go"
+        for framework, files in test_files.items():
+            if files:
+                frameworks_detected.append((framework, len(files)))
+
+        # Return highest priority framework
+        if frameworks_detected:
+            return max(frameworks_detected, key=lambda x: x[1])[0]
 
         return "pytest"  # Default fallback
 
     async def _run_pytest(
         self, path: str, pattern: Optional[str], verbose: bool, timeout: int
     ) -> ToolResult:
-        """Run pytest tests."""
+        """Run pytest tests with enhanced reporting."""
         cmd_parts = ["python", "-m", "pytest"]
 
         if verbose:
             cmd_parts.append("-v")
+        else:
+            cmd_parts.append("-q")
 
         if pattern:
             cmd_parts.extend(["-k", pattern])
+
+        # Add coverage if available
+        cmd_parts.extend(["--tb=short", "--no-header"])
+
+        # Check if coverage is available
+        try:
+            import coverage  # type: ignore # noqa: F401
+
+            cmd_parts.extend(["--cov=" + path, "--cov-report=term-missing"])
+        except ImportError:
+            pass
 
         cmd_parts.append(path)
 
@@ -128,14 +220,33 @@ class ExecutionTool(Tool):
             output = stdout.decode("utf-8") if stdout else ""
             error = stderr.decode("utf-8") if stderr else ""
 
-            # Parse pytest output for summary
+            # Enhanced pytest output parsing
             lines = output.split("\n")
             summary_line = ""
+            test_results = {"passed": 0, "failed": 0, "skipped": 0, "errors": 0}
+            coverage_percent = None
+
             for line in lines:
-                if "passed" in line or "failed" in line or "error" in line:
+                # Parse test summary
+                if " passed" in line or " failed" in line or " error" in line:
                     summary_line = line.strip()
+                    # Extract numbers
+                    import re
+
+                    numbers = re.findall(r"(\d+) (\w+)", line)
+                    for count, result_type in numbers:
+                        if result_type in test_results:
+                            test_results[result_type] = int(count)
+
+                # Parse coverage
+                if "TOTAL" in line and "%" in line:
+                    try:
+                        coverage_percent = int(line.split()[-1].replace("%", ""))
+                    except Exception:  # nosec
+                        pass
 
             success = process.returncode == 0
+            total_tests = sum(test_results.values())
 
             return ToolResult(
                 success=success,
@@ -145,6 +256,9 @@ class ExecutionTool(Tool):
                     "framework": "pytest",
                     "return_code": process.returncode,
                     "summary": summary_line,
+                    "test_results": test_results,
+                    "total_tests": total_tests,
+                    "coverage_percent": coverage_percent,
                 },
             )
 
@@ -276,8 +390,12 @@ class ExecutionTool(Tool):
             return await self._run_pytest(path, pattern, verbose, timeout)
         elif framework == "jest":
             return await self._run_jest(path, pattern, verbose, timeout)
+        elif framework == "vitest":
+            return await self._run_vitest(path, pattern, verbose, timeout)
         elif framework == "go":
             return await self._run_go_test(path, pattern, verbose, timeout)
+        elif framework == "cargo":
+            return await self._run_cargo_test(path, pattern, verbose, timeout)
         elif framework == "unittest":
             # Python unittest
             command = f"python -m unittest discover {path}"
@@ -317,6 +435,180 @@ class ExecutionTool(Tool):
                 success=False,
                 output="",
                 error=f"Unsupported test framework: {framework}",
+            )
+
+    async def _run_vitest(
+        self, path: str, pattern: Optional[str], verbose: bool, timeout: int
+    ) -> ToolResult:
+        """Run Vitest tests."""
+        cmd_parts = ["npx", "vitest", "run"]
+
+        if pattern:
+            cmd_parts.extend(["--grep", pattern])
+
+        if verbose:
+            cmd_parts.append("--reporter=verbose")
+        else:
+            cmd_parts.append("--reporter=basic")
+
+        # Add coverage if configured
+        cmd_parts.append("--coverage")
+
+        command = " ".join(cmd_parts)
+
+        try:
+            process = await asyncio.create_subprocess_shell(
+                command,
+                cwd=path,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(), timeout=timeout
+            )
+
+            output = stdout.decode("utf-8") if stdout else ""
+            error = stderr.decode("utf-8") if stderr else ""
+
+            # Enhanced vitest output parsing
+            lines = output.split("\n")
+            summary_line = ""
+            test_results = {"passed": 0, "failed": 0, "skipped": 0, "errors": 0}
+            coverage_percent = None
+
+            for line in lines:
+                # Parse test summary (Vitest format)
+                if "Test Files" in line and ("passed" in line or "failed" in line):
+                    summary_line = line.strip()
+                    # Extract numbers using regex
+                    import re
+
+                    numbers = re.findall(r"(\d+) (\w+)", line)
+                    for count, result_type in numbers:
+                        if result_type.lower() in test_results:
+                            test_results[result_type.lower()] = int(count)
+
+                # Parse coverage
+                if "All files" in line and "%" in line:
+                    try:
+                        # Vitest coverage format: All files | 85.71 | 100 | 85.71 | 85.71
+                        parts = line.split("|")
+                        if len(parts) >= 2:
+                            coverage_percent = float(parts[1].strip())
+                    except Exception:  # nosec
+                        pass
+
+            success = process.returncode == 0
+            total_tests = sum(test_results.values())
+
+            return ToolResult(
+                success=success,
+                output=output,
+                error=error if not success else None,
+                metadata={
+                    "framework": "vitest",
+                    "return_code": process.returncode,
+                    "summary": summary_line,
+                    "test_results": test_results,
+                    "total_tests": total_tests,
+                    "coverage_percent": coverage_percent,
+                },
+            )
+
+        except asyncio.TimeoutError:
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"Tests timed out after {timeout} seconds",
+            )
+        except Exception as e:
+            return ToolResult(
+                success=False, output="", error=f"Failed to run Vitest: {str(e)}"
+            )
+
+    async def _run_cargo_test(
+        self, path: str, pattern: Optional[str], verbose: bool, timeout: int
+    ) -> ToolResult:
+        """Run Cargo tests."""
+        cmd_parts = ["cargo", "test"]
+
+        if pattern:
+            cmd_parts.append(pattern)
+
+        if verbose:
+            cmd_parts.append("--verbose")
+
+        # Add output format for better parsing
+        cmd_parts.extend(["--", "--nocapture"])
+
+        command = " ".join(cmd_parts)
+
+        try:
+            process = await asyncio.create_subprocess_shell(
+                command,
+                cwd=path,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(), timeout=timeout
+            )
+
+            output = stdout.decode("utf-8") if stdout else ""
+            error = stderr.decode("utf-8") if stderr else ""
+
+            # Enhanced cargo test output parsing
+            lines = output.split("\n")
+            summary_line = ""
+            test_results = {"passed": 0, "failed": 0, "skipped": 0, "errors": 0}
+
+            for line in lines:
+                # Parse test summary (Cargo format)
+                if "test result:" in line:
+                    summary_line = line.strip()
+                    # Extract numbers: "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured"
+                    import re
+
+                    if "passed" in line:
+                        passed_match = re.search(r"(\d+) passed", line)
+                        if passed_match:
+                            test_results["passed"] = int(passed_match.group(1))
+                    if "failed" in line:
+                        failed_match = re.search(r"(\d+) failed", line)
+                        if failed_match:
+                            test_results["failed"] = int(failed_match.group(1))
+                    if "ignored" in line:
+                        ignored_match = re.search(r"(\d+) ignored", line)
+                        if ignored_match:
+                            test_results["skipped"] = int(ignored_match.group(1))
+
+            success = process.returncode == 0
+            total_tests = sum(test_results.values())
+
+            return ToolResult(
+                success=success,
+                output=output,
+                error=error if not success else None,
+                metadata={
+                    "framework": "cargo",
+                    "return_code": process.returncode,
+                    "summary": summary_line,
+                    "test_results": test_results,
+                    "total_tests": total_tests,
+                },
+            )
+
+        except asyncio.TimeoutError:
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"Tests timed out after {timeout} seconds",
+            )
+        except Exception as e:
+            return ToolResult(
+                success=False, output="", error=f"Failed to run Cargo tests: {str(e)}"
             )
 
 
