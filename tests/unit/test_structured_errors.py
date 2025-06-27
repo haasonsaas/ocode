@@ -345,7 +345,8 @@ class TestErrorCreationFromException:
 
     def test_permission_error(self):
         """Test creating error from PermissionError."""
-        original = PermissionError("Permission denied")
+        import builtins
+        original = builtins.PermissionError("Permission denied")
         original.filename = "/protected/file.txt"
 
         error = create_error_from_exception(original, "write_file", "file_tool")
@@ -374,7 +375,8 @@ class TestErrorCreationFromException:
 
     def test_timeout_error(self):
         """Test creating error from TimeoutError."""
-        original = TimeoutError("Operation timed out")
+        import builtins
+        original = builtins.TimeoutError("Operation timed out")
 
         error = create_error_from_exception(original, "long_operation", "worker")
 

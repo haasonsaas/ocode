@@ -22,7 +22,7 @@ from ocode_python.utils.file_operations import (
     wait_for_file_unlock,
 )
 from ocode_python.utils.retry_handler import RetryConfig
-from ocode_python.utils.structured_errors import FileSystemError
+from ocode_python.utils.structured_errors import FileSystemError, PermissionError
 
 
 class TestSafeFileRead:
@@ -77,7 +77,7 @@ class TestSafeFileRead:
             # Change permissions to make file unreadable
             os.chmod(temp_path, 0o000)
 
-            with pytest.raises(FileSystemError):
+            with pytest.raises(PermissionError):
                 safe_file_read(temp_path)
         finally:
             # Restore permissions for cleanup
@@ -309,7 +309,7 @@ class TestSafeFileDelete:
             os.chmod(temp_dir, 0o444)
 
             try:
-                with pytest.raises(FileSystemError):
+                with pytest.raises(PermissionError):
                     safe_file_delete(file_path)
             finally:
                 # Restore permissions for cleanup

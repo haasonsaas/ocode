@@ -362,7 +362,7 @@ class TestGitTools:
         new_file = mock_git_repo / "new_file.txt"
         new_file.write_text("New content")
 
-        result = await tool.execute(path=str(mock_git_repo), message="Add new file")
+        result = await tool.execute(path=str(mock_git_repo), message="feat: add new file")
 
         assert result.success
         assert "Created commit" in result.output

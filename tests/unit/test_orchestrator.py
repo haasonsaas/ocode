@@ -311,6 +311,7 @@ class TestConcurrentToolExecutor:
     def mock_tool_registry(self):
         registry = MagicMock(spec=ToolRegistry)
         registry.execute_tool = AsyncMock()
+        registry.get_tool.return_value = None
         return registry
 
     @pytest.fixture
@@ -337,9 +338,9 @@ class TestConcurrentToolExecutor:
         ]
 
     @pytest.mark.asyncio
-    async def test_independent_task_grouping(self, concurrent_executor, sample_tasks):
+    async def test_independent_task_grouping(self, concurrent_executor, mock_tool_registry, sample_tasks):
         """Test grouping of independent tasks."""
-        groups = concurrent_executor._group_independent_tasks(sample_tasks)
+        groups = concurrent_executor._group_independent_tasks(sample_tasks, mock_tool_registry)
 
         # Tasks with different file paths should be grouped together
         # Git status task should be in a separate group due to different resources
@@ -349,8 +350,8 @@ class TestConcurrentToolExecutor:
         file_tasks = [t for t in sample_tasks if t.tool_name == "file_read"]
         if len(file_tasks) > 1:
             # Different files should have different resources
-            resources1 = concurrent_executor._get_task_resources(file_tasks[0])
-            resources2 = concurrent_executor._get_task_resources(file_tasks[1])
+            resources1 = concurrent_executor._get_task_resources(file_tasks[0], mock_tool_registry)
+            resources2 = concurrent_executor._get_task_resources(file_tasks[1], mock_tool_registry)
             assert resources1 != resources2
 
     @pytest.mark.asyncio
@@ -374,7 +375,7 @@ class TestConcurrentToolExecutor:
         assert mock_tool_registry.execute_tool.call_count == len(sample_tasks)
 
     @pytest.mark.asyncio
-    async def test_resource_conflict_detection(self, concurrent_executor):
+    async def test_resource_conflict_detection(self, concurrent_executor, mock_tool_registry):
         """Test detection of resource conflicts."""
         conflicting_tasks = [
             CommandTask(
@@ -391,7 +392,7 @@ class TestConcurrentToolExecutor:
             ),
         ]
 
-        groups = concurrent_executor._group_independent_tasks(conflicting_tasks)
+        groups = concurrent_executor._group_independent_tasks(conflicting_tasks, mock_tool_registry)
 
         # Conflicting tasks should be in separate groups
         assert len(groups) == 2

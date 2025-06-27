@@ -185,7 +185,7 @@ class CommandSanitizer:
                 continue
 
             # Validate key format
-            if not re.match(r"^[A-Za-z_][A-Za-z0 - 9_]*$", key):
+            if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", key):
                 continue
 
             # Convert to string and limit length

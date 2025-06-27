@@ -429,15 +429,11 @@ def create_error_from_exception(
         )
 
     elif isinstance(exc, builtins.PermissionError):
-        # Return FileSystemError for permission issues as tests expect this
-        return FileSystemError(
+        # Return custom PermissionError as tests expect resource_path attribute
+        filename = getattr(exc, "filename", None)
+        return PermissionError(
             f"Permission denied: {exc}",
-            file_path=(
-                str(getattr(exc, "filename", None))
-                if getattr(exc, "filename", None)
-                else None
-            ),
-            operation_type="access",
+            resource_path=str(filename) if filename is not None else None,
             context=context,
             original_error=exc,
         )
@@ -461,9 +457,11 @@ def create_error_from_exception(
             f"Invalid value: {exc}", context=context, original_error=exc
         )
 
-    elif isinstance(exc, (TimeoutError, asyncio.TimeoutError)):
+    elif isinstance(exc, (builtins.TimeoutError, asyncio.TimeoutError)):
         return TimeoutError(
-            f"Operation timed out: {exc}", context=context, original_error=exc
+            f"Operation timed out: {exc}",
+            context=context,
+            original_error=exc,
         )
 
     else:

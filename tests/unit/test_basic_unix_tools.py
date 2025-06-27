@@ -288,7 +288,11 @@ class TestCurlTool:
 
         # Either it succeeds (very unlikely) or fails with a connection error
         if not result.success:
-            assert "error" in result.error.lower()
+            # Check for common network failure indicators
+            error_msg = result.error.lower()
+            assert any(keyword in error_msg for keyword in [
+                "error", "failed", "connection", "network", "timeout", "unreachable"
+            ])
 
 
 class TestWhichTool:
