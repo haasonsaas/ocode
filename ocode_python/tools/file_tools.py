@@ -429,18 +429,18 @@ class FileWriteTool(Tool):
             # Write the file
             if content is None:
                 content = ""
-            
+
             bytes_written = len(str(content).encode(encoding))
-            
+
             # Use atomic write for safety when not appending
             if atomic and not append:
                 try:
                     with AtomicFileWriter(
-                        validated_path, 
-                        mode="w", 
-                        encoding=encoding, 
+                        validated_path,
+                        mode="w",
+                        encoding=encoding,
                         backup=backup and file_exists,
-                        sync=True
+                        sync=True,
                     ) as f:
                         f.write(str(content))
                 except Exception as e:
@@ -461,7 +461,7 @@ class FileWriteTool(Tool):
                         f.write(str(content))
                         # Ensure data is written to disk
                         f.flush()
-                        if hasattr(f, 'fileno'):
+                        if hasattr(f, "fileno"):
                             try:
                                 os.fsync(f.fileno())
                             except (OSError, ValueError):
