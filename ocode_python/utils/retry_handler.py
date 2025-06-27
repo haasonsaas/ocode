@@ -11,7 +11,7 @@ import functools
 import logging
 import random
 import time
-from typing import Any, Callable, Optional, Tuple, Type, Union
+from typing import Any, Callable, Optional, Tuple, Type
 
 logger = logging.getLogger(__name__)
 

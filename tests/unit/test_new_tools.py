@@ -2,11 +2,8 @@
 Comprehensive tests for the new enhanced tools.
 """
 
-import asyncio
-import json
 import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 

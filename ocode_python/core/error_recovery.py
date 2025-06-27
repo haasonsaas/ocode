@@ -6,21 +6,20 @@ to analyze tool failures and propose intelligent recovery strategies. It builds 
 the existing RetryManager and extends it with context-aware debugging personas.
 """
 
-import asyncio
 import json
 import logging
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from ..prompts.prompt_composer import PromptComposer
-from ..tools.base import ErrorType, Tool, ToolResult
+from ..tools.base import ToolResult
 from .api_client import CompletionRequest, OllamaAPIClient
 
 if TYPE_CHECKING:
-    from .orchestrator import CommandTask, Priority
+    from .orchestrator import CommandTask
 
 
 logger = logging.getLogger(__name__)

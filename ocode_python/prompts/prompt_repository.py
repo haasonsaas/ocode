@@ -13,7 +13,7 @@ import hashlib
 import json
 import sqlite3
 from abc import ABC, abstractmethod
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -36,8 +36,8 @@ class PromptExample:
     tags: List[str]
     performance_score: float = 1.0
     usage_count: int = 0
-    created_at: datetime = None
-    last_used: datetime = None
+    created_at: Optional[datetime] = None
+    last_used: Optional[datetime] = None
 
     def __post_init__(self):
         if self.created_at is None:
@@ -48,8 +48,8 @@ class PromptExample:
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for storage."""
         data = asdict(self)
-        data["created_at"] = self.created_at.isoformat()
-        data["last_used"] = self.last_used.isoformat()
+        data["created_at"] = self.created_at.isoformat() if self.created_at else None
+        data["last_used"] = self.last_used.isoformat() if self.last_used else None
         data["response"] = json.dumps(self.response)
         data["tags"] = json.dumps(self.tags)
         return data
@@ -64,9 +64,9 @@ class PromptComponent:
     component_type: str  # system, analysis, workflow, etc.
     version: int = 1
     active: bool = True
-    metadata: Dict[str, Any] = None
-    created_at: datetime = None
-    updated_at: datetime = None
+    metadata: Optional[Dict[str, Any]] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     def __post_init__(self):
         if self.created_at is None:
@@ -169,7 +169,7 @@ class SQLiteExampleStore(ExampleStore):
         if not example.id:
             # Generate ID from query hash
             example.id = hashlib.md5(
-                example.query.encode(), usedforsecurity=False
+                example.query.encode()
             ).hexdigest()[:12]
 
         with sqlite3.connect(self.db_path) as conn:
@@ -217,7 +217,7 @@ class SQLiteExampleStore(ExampleStore):
             params.extend([f"%{tag}%" for tag in tags])
 
         query += " ORDER BY performance_score DESC, usage_count DESC LIMIT ?"
-        params.append(limit)
+        params.append(str(limit))
 
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
@@ -250,21 +250,32 @@ class SQLiteExampleStore(ExampleStore):
             conn.row_factory = sqlite3.Row
 
             # Build query with keyword matching
+            # For each keyword, count how many match
             # nosec B608 - SQL is constructed from safe parameterized components
             conditions = " OR ".join(["query LIKE ?" for _ in keywords])
-            values_clause = ",".join(["(?)" for _ in keywords])
+            
+            # Build match count expression
+            match_counts = []
+            for i, kw in enumerate(keywords):
+                match_counts.append("(CASE WHEN query LIKE ? THEN 1 ELSE 0 END)")
+            
+            match_count_expr = " + ".join(match_counts) if match_counts else "0"
+            
             # nosec B608 - SQL is constructed from safe parameterized components
-            query_sql = f"""  # nosec B608
+            query_sql = f"""
                 SELECT *,
-                (SELECT COUNT(*) FROM (VALUES {values_clause})
-                 WHERE query LIKE '%' || column1 || '%') as match_count
+                ({match_count_expr}) as match_count
                 FROM examples
                 WHERE {conditions}
                 ORDER BY match_count DESC, performance_score DESC
                 LIMIT ?
             """
 
-            params = [f"%{kw}%" for kw in keywords] + keywords + [limit]
+            # Parameters: match count checks, then WHERE conditions, then limit
+            params = [f"%{kw}%" for kw in keywords]  # for match count
+            params += [f"%{kw}%" for kw in keywords]  # for WHERE clause
+            params += [str(limit)]
+            
             cursor = conn.execute(query_sql, params)
 
             examples = []
@@ -311,7 +322,7 @@ class SQLiteExampleStore(ExampleStore):
             if existing:
                 component.version = existing[1] + 1
 
-            conn.execute(
+            cursor = conn.execute(
                 """
                 INSERT INTO components
                 (
@@ -322,7 +333,7 @@ class SQLiteExampleStore(ExampleStore):
                     active,
                     metadata,
                     created_at,
-                    updated_at,
+                    updated_at
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
@@ -333,8 +344,8 @@ class SQLiteExampleStore(ExampleStore):
                     component.version,
                     component.active,
                     json.dumps(component.metadata),
-                    component.created_at.isoformat(),
-                    component.updated_at.isoformat(),
+                    component.created_at.isoformat() if component.created_at else None,
+                    component.updated_at.isoformat() if component.updated_at else None,
                 ),
             )
 
@@ -345,7 +356,7 @@ class SQLiteExampleStore(ExampleStore):
                 )
                 conn.execute(query, (component.name, component.version))
 
-            return conn.lastrowid
+            return cursor.lastrowid or 0
 
     def get_component(
         self, name: str, version: Optional[int] = None

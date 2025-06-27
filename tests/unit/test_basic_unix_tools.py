@@ -2,10 +2,8 @@
 
 import os
 import tempfile
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
-import aiofiles
 import pytest
 
 from ocode_python.tools.curl_tool import CurlTool

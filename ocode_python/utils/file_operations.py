@@ -10,14 +10,12 @@ import os
 import shutil
 import time
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Optional, Union
 
 from .retry_handler import FILE_RETRY, RetryConfig, with_retry, with_retry_async
 from .structured_errors import (
-    ErrorContext,
     FileSystemError,
 )
-from .structured_errors import PermissionError as StructuredPermissionError
 from .structured_errors import (
     create_error_from_exception,
 )

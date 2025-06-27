@@ -2,7 +2,6 @@
 Tests for semantic context selection and dynamic context management.
 """
 
-import asyncio
 import os
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch

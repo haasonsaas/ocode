@@ -7,7 +7,7 @@ import os
 import shutil
 import tempfile
 from pathlib import Path
-from typing import AsyncGenerator, Generator
+from typing import Generator
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -354,7 +354,7 @@ def mock_git_repo(mock_project_dir: Path):
     )
     subprocess.run(["git", "add", "."], cwd=mock_project_dir, check=True)
     subprocess.run(
-        ["git", "commit", "-m", "Initial commit"], cwd=mock_project_dir, check=True
+        ["git", "commit", "-m", "chore: initial commit"], cwd=mock_project_dir, check=True
     )
 
     yield mock_project_dir
@@ -430,7 +430,6 @@ def mock_environment():
 def captured_output():
     """Capture stdout/stderr for CLI testing."""
     import io
-    import sys
     from contextlib import redirect_stderr, redirect_stdout
 
     stdout_capture = io.StringIO()

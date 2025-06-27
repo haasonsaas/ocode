@@ -15,7 +15,7 @@ def check_file(filepath):
 
     # Capture warnings
     def capture_warning(message, category, filename, lineno, file=None, line=None):
-        if category == SyntaxWarning and "invalid escape sequence" in str(message):
+        if category is SyntaxWarning and "invalid escape sequence" in str(message):
             issues.append((lineno, str(message)))
 
     original_showwarning = warnings.showwarning

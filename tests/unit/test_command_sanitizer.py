@@ -5,7 +5,6 @@ Test command sanitizer functionality.
 import pytest
 
 from ocode_python.utils.command_sanitizer import (
-    CommandSanitizer,
     build_safe_command,
     escape_argument,
     sanitize_command,

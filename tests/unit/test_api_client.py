@@ -1,6 +1,5 @@
 """Unit tests for Ollama API client."""
 
-import json
 from unittest.mock import AsyncMock, Mock, patch
 
 import aiohttp

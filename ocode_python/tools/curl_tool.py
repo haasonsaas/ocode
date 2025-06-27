@@ -10,7 +10,7 @@ from typing import Any
 import aiohttp
 
 from .base import ResourceLock, Tool, ToolDefinition, ToolParameter, ToolResult
-from ..utils.retry_handler import NETWORK_RETRY, retry_async
+from ..utils.retry_handler import retry_async
 
 
 class CurlTool(Tool):

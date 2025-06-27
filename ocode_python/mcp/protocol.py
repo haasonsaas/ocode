@@ -604,8 +604,6 @@ class MCPProtocol:
         }
 
         if level.lower() in level_map:
-            import logging
-
             logging.getLogger().setLevel(level_map[level.lower()])
             logging.info(f"Log level set to: {level}")
         else:
@@ -717,7 +715,7 @@ class MCPClient(MCPProtocol):
         # Wait for response with timeout
         try:
             # Create a future to wait for response
-            response_future = asyncio.Future()
+            response_future: asyncio.Future[Dict[str, Any]] = asyncio.Future()
             request_data = json.loads(request)
             request_id = request_data.get("id")
 

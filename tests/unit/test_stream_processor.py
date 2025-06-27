@@ -15,7 +15,6 @@ from ocode_python.core.stream_processor import (
     ContextBatcher,
     Operation,
     OperationResult,
-    PipelinePhase,
     PredictiveEngine,
     StreamProcessor,
 )

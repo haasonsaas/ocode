@@ -7,7 +7,6 @@ from pathlib import Path
 import pytest
 import yaml
 
-from ocode_python.tools.base import ToolResult
 from ocode_python.tools.data_tools import JsonYamlTool
 
 

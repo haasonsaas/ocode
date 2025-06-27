@@ -2,15 +2,11 @@
 Integration tests for MCP protocol.
 """
 
-import asyncio
 import json
-from unittest.mock import AsyncMock, Mock
 
 import pytest
 
 from ocode_python.mcp.protocol import (
-    JSONRPCRequest,
-    JSONRPCResponse,
     MCPProtocol,
     MCPServer,
 )
@@ -114,15 +110,19 @@ class TestMCPProtocolIntegration:
         assert "content" in response["result"]
 
     @pytest.mark.asyncio
-    async def test_resources_operations(self):
+    async def test_resources_operations(self, tmp_path):
         """Test resource operations."""
         server = MCPServer("test-server")
+
+        # Create a test file
+        test_file = tmp_path / "test.txt"
+        test_file.write_text("Test content")
 
         # Add a test resource
         from ocode_python.mcp.protocol import MCPResource
 
         test_resource = MCPResource(
-            uri="file:///test.txt",
+            uri=f"file://{test_file}",
             name="Test File",
             description="A test file",
             mime_type="text/plain",
@@ -149,7 +149,7 @@ class TestMCPProtocolIntegration:
             "jsonrpc": "2.0",
             "id": "5",
             "method": "resources/read",
-            "params": {"uri": "file:///test.txt"},
+            "params": {"uri": f"file://{test_file}"},
         }
 
         response_str = await server.handle_message(json.dumps(read_request))
@@ -157,6 +157,8 @@ class TestMCPProtocolIntegration:
 
         assert "result" in response
         assert "contents" in response["result"]
+        assert len(response["result"]["contents"]) == 1
+        assert response["result"]["contents"][0]["text"] == "Test content"
 
     @pytest.mark.asyncio
     async def test_error_handling(self):

@@ -1,11 +1,9 @@
 """Unit tests for PingTool."""
 
-import asyncio
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ocode_python.tools.base import ToolResult
 from ocode_python.tools.ping_tool import PingTool
 
 

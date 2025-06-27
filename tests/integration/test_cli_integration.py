@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 from click.testing import CliRunner
 
-from ocode_python.core.cli import cli, main
+from ocode_python.core.cli import cli
 
 
 def mock_asyncio_run(coro):
@@ -60,7 +60,6 @@ class TestCLIIntegration:
             yield "This is a test response."
 
         # Create AsyncMock for the engine instance
-        from unittest.mock import AsyncMock
 
         mock_engine_instance = AsyncMock()
         mock_engine_instance.process = mock_process
@@ -269,7 +268,6 @@ class TestCLIEndToEnd:
     @pytest.mark.asyncio
     async def test_full_cli_workflow(self, mock_project_dir: Path):
         """Test complete CLI workflow."""
-        from unittest.mock import AsyncMock
 
         from ocode_python.core.cli import handle_single_prompt
 

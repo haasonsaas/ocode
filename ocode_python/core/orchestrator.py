@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
 from ..tools.base import ResourceLock, ToolRegistry, ToolResult
 
 if TYPE_CHECKING:
-    from .error_recovery import ErrorRecoveryModule, FailureContext
+    from .error_recovery import ErrorRecoveryModule
 
 # Constants for retry and timing behavior
 DEFAULT_MAX_RETRIES = 3

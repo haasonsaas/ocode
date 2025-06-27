@@ -4,7 +4,7 @@ Tests for the retry handler utility.
 
 import asyncio
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 from ocode_python.utils.retry_handler import (
     RetryConfig,

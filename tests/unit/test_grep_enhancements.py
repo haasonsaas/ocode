@@ -2,7 +2,6 @@
 Tests for enhanced grep tool features.
 """
 
-import asyncio
 import shutil
 import tempfile
 from pathlib import Path

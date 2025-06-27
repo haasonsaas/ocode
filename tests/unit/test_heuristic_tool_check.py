@@ -3,7 +3,6 @@
 import pytest
 
 from ocode_python.core.engine import OCodeEngine
-from ocode_python.tools.base import ToolRegistry
 
 
 class TestHeuristicToolCheck:

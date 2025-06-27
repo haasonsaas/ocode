@@ -1,13 +1,10 @@
 """Comprehensive unit tests for enhanced grep tool."""
 
-import json
 import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 
-from ocode_python.tools.base import ToolResult
 from ocode_python.tools.grep_tool import GrepTool
 
 

@@ -3,12 +3,10 @@ Unit tests for context manager.
 """
 
 from pathlib import Path
-from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
 from ocode_python.core.context_manager import ContextManager, FileInfo, ProjectContext
-from ocode_python.languages.base import Symbol, SymbolType
 
 
 @pytest.mark.unit

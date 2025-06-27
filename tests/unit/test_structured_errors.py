@@ -3,11 +3,8 @@ Tests for structured error classes.
 """
 
 import asyncio
-import os
 from datetime import datetime
-from unittest.mock import patch
 
-import pytest
 
 from ocode_python.utils.structured_errors import (
     ErrorSeverity,

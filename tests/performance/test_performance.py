@@ -5,7 +5,6 @@ Performance tests for OCode components.
 import asyncio
 import time
 from pathlib import Path
-from unittest.mock import AsyncMock, Mock
 
 import pytest
 

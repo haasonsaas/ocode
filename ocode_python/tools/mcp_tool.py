@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from ..utils.timeout_handler import TimeoutError, with_timeout
-from ..utils.retry_handler import NETWORK_RETRY, retry_async
+from ..utils.retry_handler import retry_async
 from .base import (
     ErrorHandler,
     ErrorType,

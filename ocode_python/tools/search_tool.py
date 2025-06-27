@@ -9,7 +9,7 @@ from typing import List, Optional
 from urllib.parse import quote_plus
 
 import aiohttp
-from bs4 import BeautifulSoup  # type: ignore[import-untyped]
+from bs4 import BeautifulSoup
 
 from .base import ResourceLock, Tool, ToolDefinition, ToolParameter, ToolResult
 

@@ -3,9 +3,8 @@ Unit tests for security and permission management.
 """
 
 import os
-import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 

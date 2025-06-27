@@ -197,7 +197,7 @@ class PromptComposer:
         )
 
         # Build the prompt sections
-        sections = []
+        sections: List[str] = []
 
         # Add basic sections
         self._add_basic_sections(sections, components_to_include)

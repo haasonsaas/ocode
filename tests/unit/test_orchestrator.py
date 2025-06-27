@@ -2,10 +2,8 @@
 Tests for the advanced orchestrator with command queues and side effect tracking.
 """
 
-import asyncio
 import time
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 

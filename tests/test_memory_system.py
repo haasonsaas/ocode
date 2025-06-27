@@ -14,7 +14,6 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from ocode_python.core.api_client import CompletionRequest, OllamaAPIClient
 from ocode_python.core.engine import OCodeEngine
 
 # Import OCode components

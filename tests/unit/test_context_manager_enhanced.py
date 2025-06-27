@@ -2,12 +2,9 @@
 Enhanced unit tests for improved context manager.
 """
 
-import asyncio
-import shutil
 import sqlite3
-import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 

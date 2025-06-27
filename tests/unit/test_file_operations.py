@@ -2,11 +2,10 @@
 Tests for resilient file operations utility.
 """
 
-import asyncio
 import os
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -427,7 +426,7 @@ class TestFileUtilities:
             assert not is_file_locked(temp_path)
             
             # Open file exclusively to lock it
-            with open(temp_path, 'r+') as locked_file:
+            with open(temp_path, 'r+'):
                 # File should appear locked to another process
                 # Note: This test is somewhat limited as we can't easily
                 # simulate true cross-process file locking in unit tests

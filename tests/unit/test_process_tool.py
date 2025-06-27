@@ -1,7 +1,6 @@
 """Unit tests for ProcessMonitorTool."""
 
-from datetime import datetime
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 try:
     import psutil
