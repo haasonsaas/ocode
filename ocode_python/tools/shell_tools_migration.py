@@ -9,9 +9,9 @@ the enhanced version with process management.
 import warnings
 from typing import Any, Optional
 
+from .base import ToolResult
 from .shell_tools import ShellCommandTool
 from .shell_tools_enhanced import EnhancedShellCommandTool
-from .base import ToolResult
 
 
 class MigrationShellCommandTool(EnhancedShellCommandTool):
