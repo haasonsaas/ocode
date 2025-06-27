@@ -755,11 +755,11 @@ class GitStatusJSONTool(Tool):
                 "commit_short": repo.head.commit.hexsha[:8],
                 "commit_message": repo.head.commit.summary,
                 "author": str(repo.head.commit.author),
-                "staged_files": [],  # type: List[str]
-                "modified_files": [],  # type: List[str]
-                "untracked_files": [],  # type: List[str]
-                "deleted_files": [],  # type: List[str]
-                "renamed_files": [],  # type: List[Dict[str, str]]
+                "staged_files": [],
+                "modified_files": [],
+                "untracked_files": [],
+                "deleted_files": [],
+                "renamed_files": [],
             }
 
             # Get file statuses

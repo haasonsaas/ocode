@@ -3,12 +3,13 @@ File manipulation tools with centralized path validation.
 """
 
 import asyncio
-import os  # noqa: F401
+import os
 import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from ..utils import path_validator
+from ..utils.atomic_operations import AtomicFileWriter
 from ..utils.timeout_handler import TimeoutError, async_timeout
 from .base import ToolError  # noqa: F401
 from .base import (
@@ -347,6 +348,20 @@ class FileWriteTool(Tool):
                     required=False,
                     default=False,
                 ),
+                ToolParameter(
+                    name="atomic",
+                    type="boolean",
+                    description="Use atomic write operation (safer but incompatible with append)",
+                    required=False,
+                    default=True,
+                ),
+                ToolParameter(
+                    name="backup",
+                    type="boolean",
+                    description="Create backup of existing file when using atomic write",
+                    required=False,
+                    default=True,
+                ),
             ],
         )
 
@@ -365,6 +380,8 @@ class FileWriteTool(Tool):
             encoding = kwargs.get("encoding", "utf-8")
             create_dirs = kwargs.get("create_dirs", True)
             append = kwargs.get("append", False)
+            atomic = kwargs.get("atomic", True)
+            backup = kwargs.get("backup", True)
 
             # Validate path security
             if path is None:
@@ -401,16 +418,67 @@ class FileWriteTool(Tool):
             file_exists = validated_path.exists()
             original_size = validated_path.stat().st_size if file_exists else 0
 
+            # Validate atomic mode constraints
+            if atomic and append:
+                return ErrorHandler.create_error_result(
+                    "Atomic write mode is incompatible with append mode",
+                    ErrorType.VALIDATION_ERROR,
+                    {"atomic": atomic, "append": append},
+                )
+
             # Write the file
-            mode = "a" if append else "w"
             if content is None:
                 content = ""
-            with open(validated_path, mode, encoding=encoding) as f:
-                f.write(str(content))
+            
+            bytes_written = len(str(content).encode(encoding))
+            
+            # Use atomic write for safety when not appending
+            if atomic and not append:
+                try:
+                    with AtomicFileWriter(
+                        validated_path, 
+                        mode="w", 
+                        encoding=encoding, 
+                        backup=backup and file_exists,
+                        sync=True
+                    ) as f:
+                        f.write(str(content))
+                except Exception as e:
+                    return ErrorHandler.create_error_result(
+                        f"Atomic write failed: {str(e)}",
+                        ErrorType.RESOURCE_ERROR,
+                        {
+                            "path": str(validated_path),
+                            "error": str(e),
+                            "atomic": True,
+                        },
+                    )
+            else:
+                # Traditional write for append mode or when atomic is disabled
+                mode = "a" if append else "w"
+                try:
+                    with open(validated_path, mode, encoding=encoding) as f:
+                        f.write(str(content))
+                        # Ensure data is written to disk
+                        f.flush()
+                        if hasattr(f, 'fileno'):
+                            try:
+                                os.fsync(f.fileno())
+                            except (OSError, ValueError):
+                                pass  # Best effort
+                except Exception as e:
+                    return ErrorHandler.create_error_result(
+                        f"File write failed: {str(e)}",
+                        ErrorType.RESOURCE_ERROR,
+                        {
+                            "path": str(validated_path),
+                            "error": str(e),
+                            "mode": mode,
+                        },
+                    )
 
             # Verify write succeeded
             new_size = validated_path.stat().st_size
-            bytes_written = len(str(content).encode(encoding))
 
             return ErrorHandler.create_success_result(
                 f"Successfully wrote {len(content)} characters to {validated_path}",
@@ -421,6 +489,8 @@ class FileWriteTool(Tool):
                     "new_size": new_size,
                     "mode": "append" if append else "overwrite",
                     "encoding": encoding,
+                    "atomic": atomic and not append,
+                    "backup_created": backup and file_exists and atomic and not append,
                 },
             )
 
