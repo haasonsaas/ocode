@@ -8,7 +8,7 @@ This demonstrates how to create a specialized MCP server for database operations
 import asyncio
 import logging
 import os
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from ocode_python.mcp.protocol import MCPPrompt, MCPResource, MCPServer, MCPTool
 
@@ -18,12 +18,11 @@ logger = logging.getLogger(__name__)
 class DatabaseSpecialist(MCPServer):
     """Database specialist MCP server with SQL expertise."""
 
-    def __init__(self, auth_token: str = None):
+    def __init__(self, auth_token: Optional[str] = None):
         """Initialize the database specialist."""
         super().__init__(
             name="Database Specialist",
             version="1.0.0",
-            auth_token=auth_token or os.environ.get("MCP_AUTH_TOKEN"),
         )
 
         # Register capabilities
@@ -465,7 +464,7 @@ CREATE TABLE categories (
         }
 
     async def _analyze_query(
-        self, query: str, schema: Dict[str, Any] = None
+        self, query: str, schema: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Analyze SQL query for performance issues."""
         issues = []
@@ -614,7 +613,7 @@ CREATE TABLE categories (
     # Prompt handlers
 
     async def _optimize_query_prompt(
-        self, query: str, performance_metrics: Dict = None
+        self, query: str, performance_metrics: Optional[Dict[Any, Any]] = None
     ) -> str:
         """Generate query optimization prompt."""
         prompt = f"""Please help me optimize this SQL query:
@@ -644,7 +643,7 @@ Please analyze the query and provide:
         return prompt
 
     async def _design_schema_prompt(
-        self, requirements: str, constraints: Dict = None
+        self, requirements: str, constraints: Optional[Dict[Any, Any]] = None
     ) -> str:
         """Generate schema design prompt."""
         prompt = f"""Help me design a database schema for these requirements:

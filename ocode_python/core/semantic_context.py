@@ -294,15 +294,16 @@ class SemanticContextBuilder:
             with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
                 # Run embedding computation in a separate thread with timeout
                 future = executor.submit(self.embeddings_model.encode, query)
-                query_embedding = await asyncio.wait_for(
+                embedding_result: Any = await asyncio.wait_for(
                     asyncio.wrap_future(future), timeout=30.0
                 )
 
                 # Convert to numpy array if it's a tensor
-                if hasattr(query_embedding, "numpy"):
-                    query_embedding = query_embedding.numpy()
-                elif not isinstance(query_embedding, np.ndarray):
-                    query_embedding = np.array(query_embedding)
+                query_embedding: np.ndarray
+                if hasattr(embedding_result, "numpy"):
+                    query_embedding = embedding_result.numpy()
+                else:
+                    query_embedding = np.array(embedding_result)
 
                 # Process files in batches to avoid memory issues
                 batch_size = 5  # Reduced batch size for CI stability
@@ -350,13 +351,14 @@ class SemanticContextBuilder:
         # Compute embeddings for files not in cache
         if texts_to_encode and self.embeddings_model:
             try:
-                embeddings = self.embeddings_model.encode(texts_to_encode)
+                embedding_results: Any = self.embeddings_model.encode(texts_to_encode)
 
                 # Convert to numpy array if it's a tensor
-                if hasattr(embeddings, "numpy"):
-                    embeddings = embeddings.numpy()
-                if not isinstance(embeddings, np.ndarray):
-                    embeddings = np.array(embeddings)
+                embeddings: np.ndarray
+                if hasattr(embedding_results, "numpy"):
+                    embeddings = embedding_results.numpy()
+                else:
+                    embeddings = np.array(embedding_results)
 
                 for i, (semantic_file, content_hash) in enumerate(files_to_encode):
                     embedding = embeddings[i]
