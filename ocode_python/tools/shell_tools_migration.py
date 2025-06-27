@@ -7,7 +7,7 @@ the enhanced version with process management.
 """
 
 import warnings
-from typing import Any, Optional
+from typing import Any
 
 from .base import ToolResult
 from .shell_tools import ShellCommandTool
@@ -165,8 +165,9 @@ class ShellToolsMigrationHelper:
         # Add migration suggestions
         if suggestions["uses_shell_command_tool"]:
             suggestions["suggestions"].append(
-                "Replace 'from ocode_python.tools.shell_tools import ShellCommandTool' "
-                "with 'from ocode_python.tools.shell_tools_enhanced import EnhancedShellCommandTool'"
+                "Replace 'from ocode_python.tools.shell_tools import "
+                "ShellCommandTool' with 'from ocode_python.tools.shell_tools_enhanced "
+                "import EnhancedShellCommandTool'"
             )
 
             suggestions["suggestions"].append(
@@ -207,7 +208,8 @@ class ShellToolsMigrationHelper:
         # Replace imports
         migrated = migrated.replace(
             "from ocode_python.tools.shell_tools import ShellCommandTool",
-            "from ocode_python.tools.shell_tools_enhanced import EnhancedShellCommandTool",
+            "from ocode_python.tools.shell_tools_enhanced import "
+            "EnhancedShellCommandTool",
         )
 
         migrated = migrated.replace(
@@ -216,7 +218,9 @@ class ShellToolsMigrationHelper:
         )
 
         # Replace class instantiation
-        migrated = migrated.replace("ShellCommandTool()", "EnhancedShellCommandTool()")
+        migrated = migrated.replace(
+            "ShellCommandTool()", "EnhancedShellCommandTool()"
+        )
 
         # Add migration comment
         if "EnhancedShellCommandTool" in migrated and "# Migrated from" not in migrated:
@@ -225,7 +229,8 @@ class ShellToolsMigrationHelper:
                 if "EnhancedShellCommandTool" in line and "import" in line:
                     lines.insert(
                         i + 1,
-                        "# Migrated from ShellCommandTool - consider using new features",
+                        "# Migrated from ShellCommandTool - consider using "
+                        "new features",
                     )
                     break
             migrated = "\n".join(lines)
