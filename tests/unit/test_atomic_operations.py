@@ -175,7 +175,14 @@ class TestAtomicWrite:
 
         assert success is False
         assert error is not None
-        assert "Is a directory" in error or "directory" in error.lower()
+        # Windows and Unix have different error messages for directory write
+        error_lower = error.lower()
+        assert (
+            "is a directory" in error 
+            or "directory" in error_lower 
+            or "permission denied" in error_lower
+            or "access is denied" in error_lower
+        )
 
     def test_encoding_parameter(self, tmp_path):
         """Test custom encoding."""
