@@ -27,7 +27,7 @@ class ExecutionTool(Tool):
                 ToolParameter(
                     name="framework",
                     type="string",
-                    description="Test framework to use (auto, pytest, unittest, jest, vitest, go, cargo, mocha, rspec, maven, gradle)",
+                    description="Test framework to use (auto, pytest, unittest, jest, vitest, go, cargo, mocha, rspec, maven, gradle)",  # noqa: E501
                     required=False,
                 ),
                 ToolParameter(
@@ -492,7 +492,7 @@ class ExecutionTool(Tool):
                 # Parse coverage
                 if "All files" in line and "%" in line:
                     try:
-                        # Vitest coverage format: All files | 85.71 | 100 | 85.71 | 85.71
+                        # Vitest coverage format: All files | 85.71 | 100 | 85.71 | 85.71  # noqa: E501
                         parts = line.split("|")
                         if len(parts) >= 2:
                             coverage_percent = float(parts[1].strip())
@@ -568,7 +568,7 @@ class ExecutionTool(Tool):
                 # Parse test summary (Cargo format)
                 if "test result:" in line:
                     summary_line = line.strip()
-                    # Extract numbers: "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured"
+                    # Extract numbers: "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured"  # noqa: E501
                     import re
 
                     if "passed" in line:
