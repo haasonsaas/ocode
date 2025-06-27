@@ -148,7 +148,6 @@ async def managed_subprocess(
         - Resources are cleaned up
     """
     process = None
-    start_time = time.time()
 
     try:
         # Prepare kwargs
