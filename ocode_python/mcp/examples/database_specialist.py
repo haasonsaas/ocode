@@ -7,7 +7,6 @@ This demonstrates how to create a specialized MCP server for database operations
 
 import asyncio
 import logging
-import os
 from typing import Any, Dict, Optional
 
 from ocode_python.mcp.protocol import MCPPrompt, MCPResource, MCPServer, MCPTool

@@ -451,7 +451,7 @@ class ConcurrentToolExecutor:
             for arg_name, arg_value in task.arguments.items():
                 if "path" in arg_name.lower() or "file" in arg_name.lower():
                     if isinstance(arg_value, str):
-                        # Any file operation (read or write) on the same file should conflict
+                        # Any file operation on the same file should conflict
                         # Use the file path as the resource identifier
                         resources.add(f"file:{arg_value}")
                         break
