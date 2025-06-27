@@ -607,6 +607,15 @@ class ToolRegistry:
         from .file_ops_tool import CopyTool, MoveTool, RemoveTool
         from .file_tools import FileListTool, FileReadTool, FileWriteTool
         from .find_tool import FindTool
+        from .git_advanced_tools import (
+            GitAddTool,
+            GitCloneTool,
+            GitPullTool,
+            GitPushTool,
+            GitResetTool,
+            GitStashTool,
+            GitStatusJSONTool,
+        )
         from .git_tools import GitCommitTool, GitDiffTool, GitStatusTool
         from .glob_tool import AdvancedGlobTool, GlobTool
         from .grep_tool import CodeGrepTool, GrepTool
@@ -643,6 +652,14 @@ class ToolRegistry:
             GitStatusTool(),
             GitCommitTool(),
             GitDiffTool(),
+            # Advanced Git tools
+            GitAddTool(),
+            GitPullTool(),
+            GitPushTool(),
+            GitCloneTool(),
+            GitResetTool(),
+            GitStashTool(),
+            GitStatusJSONTool(),
             ShellCommandTool(),
             ExecutionTool(),
             # New enhanced tools

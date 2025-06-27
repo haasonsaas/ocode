@@ -19,7 +19,11 @@ from ocode_python.utils.file_operations import (
     wait_for_file_unlock,
 )
 from ocode_python.utils.retry_handler import RetryConfig
-from ocode_python.utils.structured_errors import FileSystemError, PermissionError, StructuredError
+from ocode_python.utils.structured_errors import (
+    FileSystemError,
+    PermissionError,
+    StructuredError,
+)
 
 
 class TestSafeFileRead:
@@ -375,8 +379,10 @@ class TestSafeDirectoryCreate:
                 safe_directory_create(file_path)
 
             # The error message should indicate the path exists
-            assert ("exists" in str(exc_info.value).lower() or 
-                    "exist_ok" in str(exc_info.value).lower())
+            assert (
+                "exists" in str(exc_info.value).lower()
+                or "exist_ok" in str(exc_info.value).lower()
+            )
 
 
 class TestFileUtilities:
@@ -506,16 +512,16 @@ class TestWindowsSpecific:
     def test_windows_file_in_use_error(self):
         """Test handling of file-in-use errors on Windows."""
         import platform
-        
+
         if platform.system() != "Windows":
             pytest.skip("Windows-only test")
-            
+
         # Create a temporary file
-        with tempfile.NamedTemporaryFile(delete=False, mode='w') as f:
+        with tempfile.NamedTemporaryFile(delete=False, mode="w") as f:
             temp_path = f.name
             f.write("test content")
             f.flush()
-            
+
             # Keep the file open to simulate it being in use
             # This should cause permission/access errors
             try:
@@ -525,7 +531,7 @@ class TestWindowsSpecific:
             finally:
                 # File will be closed when the context manager exits
                 pass
-        
+
         # Clean up after the file is closed
         if os.path.exists(temp_path):
             os.unlink(temp_path)
@@ -534,18 +540,18 @@ class TestWindowsSpecific:
     def test_windows_locked_file_detection(self):
         """Test detection of locked files on Windows."""
         import platform
-        
+
         if platform.system() != "Windows":
             pytest.skip("Windows-only test")
-            
+
         with tempfile.NamedTemporaryFile(delete=False) as f:
             temp_path = f.name
             f.write(b"test")
             f.flush()
-            
+
             # File is still open, so it should be detected as locked
-            assert is_file_locked(temp_path) == True
-            
+            assert is_file_locked(temp_path) is True
+
         # After closing, file should not be locked
-        assert is_file_locked(temp_path) == False
+        assert is_file_locked(temp_path) is False
         os.unlink(temp_path)
