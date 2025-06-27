@@ -281,7 +281,8 @@ class TestEnhancedShellCommandTool:
 
         assert result.success
         assert "execution_time" in result.metadata
-        # On Windows, very fast commands might have 0.0 execution time due to timer precision
+        # On Windows, very fast commands might have 0.0 execution time due to
+        # timer precision
         assert result.metadata["execution_time"] >= 0
         assert result.metadata["execution_time"] < 5  # Should be quick
 

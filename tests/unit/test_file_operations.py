@@ -414,8 +414,11 @@ class TestFileUtilities:
         # Should return False for nonexistent files
         # Use a path that definitely doesn't exist
         import tempfile
+
         temp_dir = tempfile.gettempdir()
-        nonexistent_path = os.path.join(temp_dir, "definitely_nonexistent_file_12345.txt")
+        nonexistent_path = os.path.join(
+            temp_dir, "definitely_nonexistent_file_12345.txt"
+        )
         assert not is_file_locked(nonexistent_path)
 
     def test_wait_for_file_unlock_immediate(self):
@@ -433,6 +436,7 @@ class TestFileUtilities:
         """Test waiting for file unlock with timeout."""
         # Create a file that we can ensure exists and is accessible
         import tempfile
+
         with tempfile.NamedTemporaryFile(delete=False) as f:
             temp_path = f.name
             f.write(b"test")
@@ -560,7 +564,7 @@ class TestWindowsSpecific:
             pytest.skip("Windows-only test")
 
         # Create a file and keep it open with exclusive access
-        with tempfile.NamedTemporaryFile(delete=False, mode='w+b') as f:
+        with tempfile.NamedTemporaryFile(delete=False, mode="w+b") as f:
             temp_path = f.name
             f.write(b"test")
             f.flush()
