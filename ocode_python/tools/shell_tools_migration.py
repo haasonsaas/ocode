@@ -147,7 +147,7 @@ class ShellToolsMigrationHelper:
             "uses_working_dir": False,
             "uses_capture_output": False,
             "migration_complexity": "low",
-            "suggestions": [],  # type: list[str]
+            "suggestions": [],
         }
 
         if "ShellCommandTool" in code:
