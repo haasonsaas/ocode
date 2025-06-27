@@ -188,6 +188,7 @@ class TestSafeFileWrite:
                 except (PermissionError, OSError):
                     # On Windows, file might still be in use
                     import time
+
                     time.sleep(0.1)
                     try:
                         os.unlink(temp_path)
