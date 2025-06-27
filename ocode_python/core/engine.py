@@ -1360,7 +1360,8 @@ When a user asks you to perform an action, call the appropriate function."""
                     and suggested_tools_list
                     and isinstance(suggested_tools_list, list)
                 ):
-                    # For simple context, only include suggested tools to avoid confusion
+                    # For simple context, only include suggested tools to
+                    # avoid confusion
                     tools = []
                     for tool_name in suggested_tools_list:
                         if isinstance(tool_name, str):

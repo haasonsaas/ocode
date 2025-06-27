@@ -254,7 +254,7 @@ class RetryManager:
         self.base_delay = base_delay
         self.error_recovery_module = error_recovery_module
 
-    async def execute_with_retry(
+    async def execute_with_retry(  # noqa: C901
         self,
         task: CommandTask,
         executor_func,

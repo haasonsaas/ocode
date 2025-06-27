@@ -252,7 +252,8 @@ def stream_json_objects(
                     yield json.loads(line)
                 except json.JSONDecodeError as e:
                     logger.warning(
-                        f"Skipping invalid JSON on line {line_number} in {file_path}: {e}"
+                        f"Skipping invalid JSON on line {line_number} "
+                        f"in {file_path}: {e}"
                     )
                     continue
 

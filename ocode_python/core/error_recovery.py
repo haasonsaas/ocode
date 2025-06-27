@@ -85,7 +85,8 @@ class RecoveryStrategy:
 
 class DebuggerPersona:
     """
-    Specialized LLM persona for analyzing tool failures and proposing recovery strategies.
+    Specialized LLM persona for analyzing tool failures and proposing
+    recovery strategies.
 
     This persona acts as an expert debugger that can:
     1. Analyze the context of tool failures
@@ -164,6 +165,10 @@ class DebuggerPersona:
             if entry.get("recovery_successful", False)
         ]
 
+        # Extract metadata for cleaner f-string formatting
+        metadata = failure_context.tool_result.metadata
+        error_type = metadata.get("error_type", "unknown") if metadata else "unknown"
+
         prompt = f"""<role>
 You are an expert software engineering debugger and problem solver.
 Your job is to analyze tool execution failures and propose intelligent
@@ -187,7 +192,7 @@ practical solutions.
 
 **Error Information:**
 - Success: {failure_context.tool_result.success}
-- Error Type: {failure_context.tool_result.metadata.get('error_type', 'unknown') if failure_context.tool_result.metadata else 'unknown'}
+- Error Type: {error_type}
 - Error Message: {failure_context.tool_result.error}
 - Output: {failure_context.tool_result.output[:500]}...
 
@@ -222,7 +227,8 @@ Available recovery strategy types:
 </recovery_strategy_types>
 
 <instructions>
-Analyze the failure and respond with ONLY a JSON array of recovery strategies. Each strategy should include:
+Analyze the failure and respond with ONLY a JSON array of recovery
+strategies. Each strategy should include:
 
 {
   "strategy_type": "one of the types above",
@@ -278,7 +284,7 @@ Order strategies by confidence (highest first). Provide 1-3 strategies.
                             task_id=str(uuid.uuid4()),
                             tool_name=cmd["tool_name"],
                             arguments=cmd["arguments"],
-                            priority=OrchestratorPriority.HIGH,  # Prerequisites should be high priority
+                            priority=OrchestratorPriority.HIGH,
                         )
                         for cmd in data.get("prerequisite_steps", [])
                     ]
@@ -385,10 +391,10 @@ Order strategies by confidence (highest first). Provide 1-3 strategies.
 
         self.recovery_history.append(outcome_entry)
 
-        logger.info(
-            f"Recovery attempt {'succeeded' if recovery_successful else 'failed'}: "
-            f"{attempted_strategy.strategy_type.value} for {failure_context.failed_tool}"
-        )
+        status = "succeeded" if recovery_successful else "failed"
+        strategy_type = attempted_strategy.strategy_type.value
+        tool_name = failure_context.failed_tool
+        logger.info(f"Recovery attempt {status}: {strategy_type} for {tool_name}")
 
 
 class ErrorRecoveryModule:
