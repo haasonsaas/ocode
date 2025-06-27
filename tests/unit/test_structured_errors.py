@@ -5,22 +5,21 @@ Tests for structured error classes.
 import asyncio
 from datetime import datetime
 
-
 from ocode_python.utils.structured_errors import (
-    ErrorSeverity,
-    ErrorCategory,
-    ErrorContext,
-    StructuredError,
-    ValidationError,
-    PermissionError,
-    NetworkError,
-    FileSystemError,
-    ParsingError,
-    TimeoutError,
     AuthenticationError,
     ConfigurationError,
-    ResourceError,
+    ErrorCategory,
+    ErrorContext,
+    ErrorSeverity,
     ExecutionError,
+    FileSystemError,
+    NetworkError,
+    ParsingError,
+    PermissionError,
+    ResourceError,
+    StructuredError,
+    TimeoutError,
+    ValidationError,
     create_error_from_exception,
     format_error_for_user,
 )
@@ -56,11 +55,8 @@ class TestErrorContext:
 
     def test_basic_context_creation(self):
         """Test basic error context creation."""
-        context = ErrorContext(
-            operation="test_operation",
-            component="test_component"
-        )
-        
+        context = ErrorContext(operation="test_operation", component="test_component")
+
         assert context.operation == "test_operation"
         assert context.component == "test_component"
         assert context.details == {}
@@ -71,14 +67,14 @@ class TestErrorContext:
         """Test error context with details and user data."""
         details = {"key": "value", "number": 42}
         user_data = {"user_input": "test"}
-        
+
         context = ErrorContext(
             operation="test_operation",
             component="test_component",
             details=details,
-            user_data=user_data
+            user_data=user_data,
         )
-        
+
         assert context.details == details
         assert context.user_data == user_data
 
@@ -88,11 +84,11 @@ class TestErrorContext:
             operation="test_operation",
             component="test_component",
             details={"test": "data"},
-            user_data={"input": "value"}
+            user_data={"input": "value"},
         )
-        
+
         result = context.to_dict()
-        
+
         assert result["operation"] == "test_operation"
         assert result["component"] == "test_component"
         assert result["details"] == {"test": "data"}
@@ -106,7 +102,7 @@ class TestStructuredError:
     def test_basic_error_creation(self):
         """Test basic structured error creation."""
         error = StructuredError("Test error message")
-        
+
         assert str(error) == "Test error message"
         assert error.message == "Test error message"
         assert error.category == ErrorCategory.UNKNOWN
@@ -121,7 +117,7 @@ class TestStructuredError:
         context = ErrorContext("test_op", "test_component")
         original = ValueError("original error")
         suggestions = ["Try this", "Try that"]
-        
+
         error = StructuredError(
             message="Test error",
             category=ErrorCategory.VALIDATION,
@@ -129,9 +125,9 @@ class TestStructuredError:
             context=context,
             original_error=original,
             suggestions=suggestions,
-            error_code="ERR001"
+            error_code="ERR001",
         )
-        
+
         assert error.category == ErrorCategory.VALIDATION
         assert error.severity == ErrorSeverity.HIGH
         assert error.context is context
@@ -148,11 +144,11 @@ class TestStructuredError:
             severity=ErrorSeverity.HIGH,
             context=context,
             suggestions=["Fix this"],
-            error_code="ERR001"
+            error_code="ERR001",
         )
-        
+
         result = error.to_dict()
-        
+
         assert result["type"] == "StructuredError"
         assert result["message"] == "Test error"
         assert result["category"] == "validation"
@@ -164,9 +160,7 @@ class TestStructuredError:
     def test_get_debug_info(self):
         """Test getting debug information."""
         context = ErrorContext(
-            "test_operation", 
-            "test_component",
-            details={"detail_key": "detail_value"}
+            "test_operation", "test_component", details={"detail_key": "detail_value"}
         )
         error = StructuredError(
             message="Test error",
@@ -174,11 +168,11 @@ class TestStructuredError:
             severity=ErrorSeverity.HIGH,
             context=context,
             suggestions=["Try this", "Try that"],
-            error_code="ERR001"
+            error_code="ERR001",
         )
-        
+
         debug_info = error.get_debug_info()
-        
+
         assert "Error: StructuredError" in debug_info
         assert "Message: Test error" in debug_info
         assert "Category: validation" in debug_info
@@ -200,9 +194,9 @@ class TestSpecificErrorClasses:
             message="Invalid input",
             field_name="email",
             field_value="invalid-email",
-            expected_type="email address"
+            expected_type="email address",
         )
-        
+
         assert error.category == ErrorCategory.VALIDATION
         assert error.severity == ErrorSeverity.MEDIUM
         assert error.field_name == "email"
@@ -214,9 +208,9 @@ class TestSpecificErrorClasses:
         error = PermissionError(
             message="Access denied",
             resource_path="/protected/file.txt",
-            required_permission="read"
+            required_permission="read",
         )
-        
+
         assert error.category == ErrorCategory.PERMISSION
         assert error.severity == ErrorSeverity.HIGH
         assert error.resource_path == "/protected/file.txt"
@@ -228,9 +222,9 @@ class TestSpecificErrorClasses:
             message="Connection failed",
             url="https://api.example.com",
             status_code=404,
-            retry_count=3
+            retry_count=3,
         )
-        
+
         assert error.category == ErrorCategory.NETWORK
         assert error.severity == ErrorSeverity.MEDIUM
         assert error.url == "https://api.example.com"
@@ -242,9 +236,9 @@ class TestSpecificErrorClasses:
         error = FileSystemError(
             message="File not found",
             file_path="/path/to/file.txt",
-            operation_type="read"
+            operation_type="read",
         )
-        
+
         assert error.category == ErrorCategory.FILE_SYSTEM
         assert error.severity == ErrorSeverity.MEDIUM
         assert error.file_path == "/path/to/file.txt"
@@ -253,12 +247,9 @@ class TestSpecificErrorClasses:
     def test_parsing_error(self):
         """Test ParsingError class."""
         error = ParsingError(
-            message="Invalid JSON",
-            data_format="json",
-            line_number=5,
-            column_number=12
+            message="Invalid JSON", data_format="json", line_number=5, column_number=12
         )
-        
+
         assert error.category == ErrorCategory.PARSING
         assert error.severity == ErrorSeverity.MEDIUM
         assert error.data_format == "json"
@@ -270,9 +261,9 @@ class TestSpecificErrorClasses:
         error = TimeoutError(
             message="Operation timed out",
             timeout_duration=30.0,
-            operation_name="api_call"
+            operation_name="api_call",
         )
-        
+
         assert error.category == ErrorCategory.TIMEOUT
         assert error.severity == ErrorSeverity.MEDIUM
         assert error.timeout_duration == 30.0
@@ -283,9 +274,9 @@ class TestSpecificErrorClasses:
         error = AuthenticationError(
             message="Authentication failed",
             auth_method="bearer_token",
-            provider="github"
+            provider="github",
         )
-        
+
         assert error.category == ErrorCategory.AUTHENTICATION
         assert error.severity == ErrorSeverity.HIGH
         assert error.auth_method == "bearer_token"
@@ -296,9 +287,9 @@ class TestSpecificErrorClasses:
         error = ConfigurationError(
             message="Missing configuration",
             config_key="api_key",
-            config_file="config.yaml"
+            config_file="config.yaml",
         )
-        
+
         assert error.category == ErrorCategory.CONFIGURATION
         assert error.severity == ErrorSeverity.HIGH
         assert error.config_key == "api_key"
@@ -310,9 +301,9 @@ class TestSpecificErrorClasses:
             message="Memory limit exceeded",
             resource_type="memory",
             current_usage=1024,
-            limit=512
+            limit=512,
         )
-        
+
         assert error.category == ErrorCategory.RESOURCE
         assert error.severity == ErrorSeverity.HIGH
         assert error.resource_type == "memory"
@@ -326,9 +317,9 @@ class TestSpecificErrorClasses:
             command="ls /nonexistent",
             exit_code=2,
             stdout="",
-            stderr="ls: /nonexistent: No such file or directory"
+            stderr="ls: /nonexistent: No such file or directory",
         )
-        
+
         assert error.category == ErrorCategory.EXECUTION
         assert error.severity == ErrorSeverity.MEDIUM
         assert error.command == "ls /nonexistent"
@@ -344,11 +335,9 @@ class TestErrorCreationFromException:
         """Test creating error from FileNotFoundError."""
         original = FileNotFoundError("No such file: test.txt")
         original.filename = "test.txt"
-        
-        error = create_error_from_exception(
-            original, "read_file", "file_tool"
-        )
-        
+
+        error = create_error_from_exception(original, "read_file", "file_tool")
+
         assert isinstance(error, FileSystemError)
         assert error.file_path == "test.txt"
         assert error.operation_type == "read"
@@ -358,11 +347,9 @@ class TestErrorCreationFromException:
         """Test creating error from PermissionError."""
         original = PermissionError("Permission denied")
         original.filename = "/protected/file.txt"
-        
-        error = create_error_from_exception(
-            original, "write_file", "file_tool"
-        )
-        
+
+        error = create_error_from_exception(original, "write_file", "file_tool")
+
         assert isinstance(error, PermissionError)
         assert error.resource_path == "/protected/file.txt"
         assert error.original_error is original
@@ -370,55 +357,47 @@ class TestErrorCreationFromException:
     def test_connection_error(self):
         """Test creating error from ConnectionError."""
         original = ConnectionError("Network unreachable")
-        
-        error = create_error_from_exception(
-            original, "http_request", "curl_tool"
-        )
-        
+
+        error = create_error_from_exception(original, "http_request", "curl_tool")
+
         assert isinstance(error, NetworkError)
         assert error.original_error is original
 
     def test_value_error(self):
         """Test creating error from ValueError."""
         original = ValueError("Invalid input format")
-        
-        error = create_error_from_exception(
-            original, "parse_input", "parser"
-        )
-        
+
+        error = create_error_from_exception(original, "parse_input", "parser")
+
         assert isinstance(error, ValidationError)
         assert error.original_error is original
 
     def test_timeout_error(self):
         """Test creating error from TimeoutError."""
         original = TimeoutError("Operation timed out")
-        
-        error = create_error_from_exception(
-            original, "long_operation", "worker"
-        )
-        
+
+        error = create_error_from_exception(original, "long_operation", "worker")
+
         assert isinstance(error, TimeoutError)
         assert error.original_error is original
 
     def test_asyncio_timeout_error(self):
         """Test creating error from asyncio.TimeoutError."""
         original = asyncio.TimeoutError()
-        
-        error = create_error_from_exception(
-            original, "async_operation", "async_worker"
-        )
-        
+
+        error = create_error_from_exception(original, "async_operation", "async_worker")
+
         assert isinstance(error, TimeoutError)
         assert error.original_error is original
 
     def test_unknown_exception(self):
         """Test creating error from unknown exception type."""
         original = RuntimeError("Something went wrong")
-        
+
         error = create_error_from_exception(
             original, "unknown_operation", "unknown_component"
         )
-        
+
         assert isinstance(error, StructuredError)
         assert error.category == ErrorCategory.UNKNOWN
         assert error.original_error is original
@@ -427,11 +406,11 @@ class TestErrorCreationFromException:
         """Test creating error with additional context."""
         original = ValueError("Invalid input")
         additional_context = {"input_value": "test", "expected_format": "json"}
-        
+
         error = create_error_from_exception(
             original, "validate_input", "validator", additional_context
         )
-        
+
         assert error.context.details == additional_context
 
 
@@ -442,9 +421,9 @@ class TestErrorFormatting:
         """Test formatting basic error."""
         context = ErrorContext("test_operation", "test_component")
         error = StructuredError("Something went wrong", context=context)
-        
+
         formatted = format_error_for_user(error)
-        
+
         assert "❌ Something went wrong" in formatted
         assert "Operation: test_operation" in formatted
 
@@ -452,13 +431,11 @@ class TestErrorFormatting:
         """Test formatting FileSystemError."""
         context = ErrorContext("read_file", "file_tool")
         error = FileSystemError(
-            "File not found",
-            file_path="/path/to/file.txt",
-            context=context
+            "File not found", file_path="/path/to/file.txt", context=context
         )
-        
+
         formatted = format_error_for_user(error)
-        
+
         assert "❌ File not found" in formatted
         assert "Operation: read_file" in formatted
         assert "File: /path/to/file.txt" in formatted
@@ -470,11 +447,11 @@ class TestErrorFormatting:
             "Request failed",
             url="https://api.example.com",
             status_code=404,
-            context=context
+            context=context,
         )
-        
+
         formatted = format_error_for_user(error)
-        
+
         assert "❌ Request failed" in formatted
         assert "Operation: http_request" in formatted
         assert "URL: https://api.example.com" in formatted
@@ -484,13 +461,11 @@ class TestErrorFormatting:
         """Test formatting ValidationError."""
         context = ErrorContext("validate_input", "validator")
         error = ValidationError(
-            "Invalid email format",
-            field_name="email",
-            context=context
+            "Invalid email format", field_name="email", context=context
         )
-        
+
         formatted = format_error_for_user(error)
-        
+
         assert "❌ Invalid email format" in formatted
         assert "Operation: validate_input" in formatted
         assert "Field: email" in formatted
@@ -504,12 +479,12 @@ class TestErrorFormatting:
             suggestions=[
                 "Check your configuration",
                 "Verify your permissions",
-                "Try again later"
-            ]
+                "Try again later",
+            ],
         )
-        
+
         formatted = format_error_for_user(error)
-        
+
         assert "Suggestions:" in formatted
         assert "• Check your configuration" in formatted
         assert "• Verify your permissions" in formatted
@@ -518,9 +493,9 @@ class TestErrorFormatting:
     def test_format_error_without_context(self):
         """Test formatting error without context."""
         error = StructuredError("Simple error message")
-        
+
         formatted = format_error_for_user(error)
-        
+
         assert formatted == "❌ Simple error message"
 
 
@@ -541,7 +516,7 @@ class TestErrorInheritance:
             ResourceError,
             ExecutionError,
         ]
-        
+
         for error_class in error_classes:
             error = error_class("Test message")
             assert isinstance(error, StructuredError)
@@ -561,7 +536,7 @@ class TestErrorInheritance:
             ResourceError: ErrorCategory.RESOURCE,
             ExecutionError: ErrorCategory.EXECUTION,
         }
-        
+
         for error_class, expected_category in category_mappings.items():
             error = error_class("Test message")
             assert error.category == expected_category
@@ -573,12 +548,9 @@ class TestEdgeCases:
     def test_error_with_none_values(self):
         """Test error creation with None values."""
         error = StructuredError(
-            message="Test",
-            context=None,
-            original_error=None,
-            suggestions=None
+            message="Test", context=None, original_error=None, suggestions=None
         )
-        
+
         assert error.context is None
         assert error.original_error is None
         assert error.suggestions == []
@@ -591,11 +563,11 @@ class TestEdgeCases:
             details={
                 "nested": {"data": "value"},
                 "list": [1, 2, 3],
-                "none_value": None
-            }
+                "none_value": None,
+            },
         )
         error = StructuredError("Test", context=context)
-        
+
         # Should not raise an exception
         result = error.to_dict()
         assert "context" in result

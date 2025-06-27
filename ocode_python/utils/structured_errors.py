@@ -413,7 +413,7 @@ def create_error_from_exception(
     # If it's already a StructuredError, just return it
     if isinstance(exc, StructuredError):
         return exc
-    
+
     context = ErrorContext(
         operation=operation, component=component, details=additional_context or {}
     )
@@ -432,12 +432,16 @@ def create_error_from_exception(
         # Return FileSystemError for permission issues as tests expect this
         return FileSystemError(
             f"Permission denied: {exc}",
-            file_path=str(getattr(exc, 'filename', None)) if getattr(exc, 'filename', None) else None,
+            file_path=(
+                str(getattr(exc, "filename", None))
+                if getattr(exc, "filename", None)
+                else None
+            ),
             operation_type="access",
             context=context,
             original_error=exc,
         )
-    
+
     elif isinstance(exc, FileExistsError):
         return FileSystemError(
             f"File exists: {exc}",

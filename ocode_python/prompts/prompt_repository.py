@@ -13,7 +13,7 @@ import hashlib
 import json
 import sqlite3
 from abc import ABC, abstractmethod
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -168,9 +168,9 @@ class SQLiteExampleStore(ExampleStore):
         """Add a new example to the database."""
         if not example.id:
             # Generate ID from query hash
-            example.id = hashlib.md5(
-                example.query.encode()
-            ).hexdigest()[:12]
+            example.id = hashlib.md5(example.query.encode()).hexdigest()[  # nosec B324
+                :12
+            ]
 
         with sqlite3.connect(self.db_path) as conn:
             data = example.to_dict()
@@ -253,14 +253,14 @@ class SQLiteExampleStore(ExampleStore):
             # For each keyword, count how many match
             # nosec B608 - SQL is constructed from safe parameterized components
             conditions = " OR ".join(["query LIKE ?" for _ in keywords])
-            
+
             # Build match count expression
             match_counts = []
             for i, kw in enumerate(keywords):
                 match_counts.append("(CASE WHEN query LIKE ? THEN 1 ELSE 0 END)")
-            
+
             match_count_expr = " + ".join(match_counts) if match_counts else "0"
-            
+
             # nosec B608 - SQL is constructed from safe parameterized components
             query_sql = f"""
                 SELECT *,
@@ -275,7 +275,7 @@ class SQLiteExampleStore(ExampleStore):
             params = [f"%{kw}%" for kw in keywords]  # for match count
             params += [f"%{kw}%" for kw in keywords]  # for WHERE clause
             params += [str(limit)]
-            
+
             cursor = conn.execute(query_sql, params)
 
             examples = []

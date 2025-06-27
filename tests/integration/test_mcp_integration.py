@@ -6,10 +6,7 @@ import json
 
 import pytest
 
-from ocode_python.mcp.protocol import (
-    MCPProtocol,
-    MCPServer,
-)
+from ocode_python.mcp.protocol import MCPProtocol, MCPServer
 from ocode_python.mcp.server import OCodeMCPServer
 
 

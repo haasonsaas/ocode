@@ -159,7 +159,7 @@ configure_ci_cd(
     pipeline_name="Deploy to Production",
     definition="""
 name: Deploy to Production
-on: 
+on:
   push:
     branches:
       - main
@@ -207,4 +207,3 @@ configure_ci_cd(
 *   `bash` or `shell_command` will be used for interacting with platform-specific CLIs (e.g., Jenkins CLI, Azure DevOps CLI).
 *   `json_yaml` will be useful for parsing and generating YAML/JSON-based pipeline definitions.
 *   Could integrate with `test_runner` and `lint` to ensure that CI/CD configurations include appropriate quality checks.
-

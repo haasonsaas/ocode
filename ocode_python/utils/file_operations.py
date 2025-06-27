@@ -13,12 +13,7 @@ from pathlib import Path
 from typing import Optional, Union
 
 from .retry_handler import FILE_RETRY, RetryConfig, with_retry, with_retry_async
-from .structured_errors import (
-    FileSystemError,
-)
-from .structured_errors import (
-    create_error_from_exception,
-)
+from .structured_errors import FileSystemError, create_error_from_exception
 
 
 def safe_file_read(
@@ -67,7 +62,7 @@ def safe_file_read(
         # If it's already a FileSystemError, just re-raise it
         if isinstance(original, FileSystemError):
             raise original
-        
+
         raise create_error_from_exception(
             original,
             "file_read",
@@ -154,7 +149,7 @@ def safe_file_write(
         # If it's already a StructuredError, just re-raise it
         if isinstance(original, FileSystemError):
             raise original
-        
+
         raise create_error_from_exception(
             original,
             "file_write",
@@ -216,7 +211,7 @@ def safe_file_copy(
         # If it's already a StructuredError, just re-raise it
         if isinstance(original, FileSystemError):
             raise original
-        
+
         raise create_error_from_exception(
             original,
             "file_copy",
@@ -277,7 +272,7 @@ def safe_file_move(
         # If it's already a StructuredError, just re-raise it
         if isinstance(original, FileSystemError):
             raise original
-        
+
         raise create_error_from_exception(
             original,
             "file_move",
@@ -343,7 +338,7 @@ def safe_file_delete(
         # If it's already a StructuredError, just re-raise it
         if isinstance(original, FileSystemError):
             raise original
-        
+
         raise create_error_from_exception(
             original,
             "file_delete",
@@ -400,7 +395,7 @@ def safe_directory_create(
         # If it's already a StructuredError, just re-raise it
         if isinstance(original, FileSystemError):
             raise original
-        
+
         raise create_error_from_exception(
             original,
             "directory_create",
@@ -456,7 +451,7 @@ async def safe_file_read_async(
         # If it's already a StructuredError, just re-raise it
         if isinstance(original, FileSystemError):
             raise original
-        
+
         raise create_error_from_exception(
             original,
             "file_read_async",
@@ -512,7 +507,7 @@ async def safe_file_write_async(
         # If it's already a StructuredError, just re-raise it
         if isinstance(original, FileSystemError):
             raise original
-        
+
         raise create_error_from_exception(
             original,
             "file_write_async",

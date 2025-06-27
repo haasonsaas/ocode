@@ -65,7 +65,7 @@ class RetryConfig:
 
         # Add jitter to prevent thundering herd
         if self.jitter:
-            delay *= 0.5 + random.random() * 0.5  # 50%-100% of calculated delay
+            delay *= 0.5 + random.random() * 0.5  # nosec B311 # 50%-100% of calculated delay
 
         return delay
 
@@ -133,7 +133,8 @@ def retry_sync(
                             on_retry(e, attempt + 1, delay)
 
                         logger.debug(
-                            f"Retrying {func.__name__} (attempt {attempt + 1}/{max_attempts}) "
+                            f"Retrying {func.__name__} "
+                            f"(attempt {attempt + 1}/{max_attempts}) "
                             f"after {delay:.2f}s due to: {e}"
                         )
 
@@ -210,7 +211,8 @@ def retry_async(
                             on_retry(e, attempt + 1, delay)
 
                         logger.debug(
-                            f"Retrying {func.__name__} (attempt {attempt + 1}/{max_attempts}) "
+                            f"Retrying {func.__name__} "
+                            f"(attempt {attempt + 1}/{max_attempts}) "
                             f"after {delay:.2f}s due to: {e}"
                         )
 

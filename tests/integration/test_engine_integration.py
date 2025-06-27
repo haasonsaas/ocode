@@ -61,7 +61,9 @@ class TestOCodeEngineIntegration:
 
         assert len(responses) > 0
         # The mocked response should contain the expected content
-        assert "help you read that file" in all_content or "file contains" in all_content
+        assert (
+            "help you read that file" in all_content or "file contains" in all_content
+        )
 
     @pytest.mark.asyncio
     async def test_engine_conversation_history(self, ocode_engine: OCodeEngine):

@@ -165,11 +165,15 @@ class DebuggerPersona:
         ]
 
         prompt = f"""<role>
-You are an expert software engineering debugger and problem solver. Your job is to analyze tool execution failures and propose intelligent recovery strategies.
+You are an expert software engineering debugger and problem solver.
+Your job is to analyze tool execution failures and propose intelligent
+recovery strategies.
 </role>
 
 <task>
-Analyze the following tool failure and propose specific, actionable recovery strategies. Focus on understanding the root cause and providing practical solutions.
+Analyze the following tool failure and propose specific, actionable
+recovery strategies. Focus on understanding the root cause and providing
+practical solutions.
 </task>
 
 <failure_context>

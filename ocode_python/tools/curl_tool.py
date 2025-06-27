@@ -9,8 +9,8 @@ from typing import Any
 
 import aiohttp
 
-from .base import ResourceLock, Tool, ToolDefinition, ToolParameter, ToolResult
 from ..utils.retry_handler import retry_async
+from .base import ResourceLock, Tool, ToolDefinition, ToolParameter, ToolResult
 
 
 class CurlTool(Tool):
@@ -99,7 +99,7 @@ class CurlTool(Tool):
             asyncio.TimeoutError,
             ConnectionError,
             OSError,
-        )
+        ),
     )
     async def _make_request(self, **kwargs: Any) -> ToolResult:
         """Make HTTP request with retry logic."""
@@ -115,7 +115,7 @@ class CurlTool(Tool):
 
         if not url:
             return ToolResult(success=False, output="", error="URL is required")
-        
+
         # Prepare headers
         request_headers = headers or {}
 
@@ -163,9 +163,7 @@ class CurlTool(Tool):
 
                     # Format output
                     if include_headers:
-                        version_str = (
-                            "HTTP/1.1"  # Default if version is not available
-                        )
+                        version_str = "HTTP/1.1"  # Default if version is not available
                         if response.version:
                             version_str = f"{response.version.major}.{response.version.minor}"  # noqa: E501
                         header_lines = [
@@ -173,9 +171,7 @@ class CurlTool(Tool):
                         ]
                         for name, value in response.headers.items():
                             header_lines.append(f"{name}: {value}")
-                        header_lines.append(
-                            ""
-                        )  # Empty line between headers and body
+                        header_lines.append("")  # Empty line between headers and body
 
                         output_text = "\n".join(header_lines) + response_text
                     else:
@@ -216,7 +212,7 @@ class CurlTool(Tool):
         except Exception as e:
             # Final fallback if retries are exhausted
             return ToolResult(
-                success=False, 
-                output="", 
-                error=f"Network request failed after retries: {str(e)}"
+                success=False,
+                output="",
+                error=f"Network request failed after retries: {str(e)}",
             )

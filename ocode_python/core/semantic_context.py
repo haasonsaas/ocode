@@ -308,9 +308,7 @@ class SemanticContextBuilder:
                 batch_size = 5  # Reduced batch size for CI stability
                 for i in range(0, len(semantic_files), batch_size):
                     batch = semantic_files[i : i + batch_size]
-                    await self._process_embedding_batch(
-                        query_embedding, batch
-                    )
+                    await self._process_embedding_batch(query_embedding, batch)
 
         except (Exception, asyncio.TimeoutError) as e:
             logging.warning(f"Error computing semantic scores: {e}")

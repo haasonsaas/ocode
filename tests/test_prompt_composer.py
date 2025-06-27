@@ -2,14 +2,10 @@
 Tests for the modular prompt composition system.
 """
 
-
 import pytest
 
 from ocode_python.prompts.prompt_composer import PromptComposer
-from ocode_python.prompts.prompt_repository import (
-    PromptExample,
-    PromptRepository,
-)
+from ocode_python.prompts.prompt_repository import PromptExample, PromptRepository
 
 
 class TestPromptComposer:
@@ -27,27 +23,27 @@ class TestPromptComposer:
         (system_dir / "core_capabilities.md").write_text(
             "- Advanced code analysis\n- Tool orchestration"
         )
-        
+
         (system_dir / "task_analysis_framework.md").write_text(
             "Task analysis framework for understanding user requests"
         )
-        
+
         (system_dir / "workflow_patterns.md").write_text(
             "Common workflow patterns for task execution"
         )
-        
+
         (system_dir / "response_strategies.md").write_text(
             "Strategies for generating effective responses"
         )
-        
+
         (system_dir / "error_handling.md").write_text(
             "Error handling and recovery procedures"
         )
-        
+
         (system_dir / "output_guidelines.md").write_text(
             "Guidelines for output formatting"
         )
-        
+
         (system_dir / "thinking_framework.md").write_text(
             "Framework for systematic thinking and analysis"
         )
@@ -58,7 +54,7 @@ class TestPromptComposer:
         (analysis_dir / "tool_usage_criteria.md").write_text(
             "USE TOOLS when: file operations needed"
         )
-        
+
         (analysis_dir / "decision_criteria.md").write_text(
             "Criteria for making tool usage decisions"
         )
@@ -227,7 +223,7 @@ class TestPromptComposerWithRepository:
         # Create basic prompt structure
         system_dir = tmp_path / "system"
         system_dir.mkdir()
-        
+
         # Create all required component files
         (system_dir / "role.md").write_text("AI Assistant")
         (system_dir / "core_capabilities.md").write_text(

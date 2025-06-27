@@ -354,7 +354,9 @@ def mock_git_repo(mock_project_dir: Path):
     )
     subprocess.run(["git", "add", "."], cwd=mock_project_dir, check=True)
     subprocess.run(
-        ["git", "commit", "-m", "chore: initial commit"], cwd=mock_project_dir, check=True
+        ["git", "commit", "-m", "chore: initial commit"],
+        cwd=mock_project_dir,
+        check=True,
     )
 
     yield mock_project_dir

@@ -170,14 +170,14 @@ class MemoryReadTool(Tool):
         # Check if we're in a project with .ocode directory
         current_dir = Path.cwd()
         local_ocode = current_dir / ".ocode" / "memory"
-        
+
         # Use local .ocode directory if it exists or if we're in a test environment
         if local_ocode.parent.exists() or "test" in str(current_dir):
             memory_dir = local_ocode
         else:
             # Otherwise use home directory for consistency across CLI and REPL
             memory_dir = Path.home() / ".ocode" / "memory"
-        
+
         memory_dir.mkdir(parents=True, exist_ok=True)
         return memory_dir
 
@@ -328,7 +328,10 @@ class MemoryReadTool(Tool):
                 if isinstance(entry["value"], dict) and "value" in entry["value"]:
                     actual_value = entry["value"]["value"]
                     # Check if it's an appended list
-                    if isinstance(actual_value, list) and all(isinstance(item, dict) and "data" in item for item in actual_value):
+                    if isinstance(actual_value, list) and all(
+                        isinstance(item, dict) and "data" in item
+                        for item in actual_value
+                    ):
                         value_preview = f"[{len(actual_value)} entries]"
                     else:
                         value_preview = str(actual_value)
@@ -493,14 +496,14 @@ class MemoryWriteTool(Tool):
         # Check if we're in a project with .ocode directory
         current_dir = Path.cwd()
         local_ocode = current_dir / ".ocode" / "memory"
-        
+
         # Use local .ocode directory if it exists or if we're in a test environment
         if local_ocode.parent.exists() or "test" in str(current_dir):
             memory_dir = local_ocode
         else:
             # Otherwise use home directory for consistency across CLI and REPL
             memory_dir = Path.home() / ".ocode" / "memory"
-        
+
         memory_dir.mkdir(parents=True, exist_ok=True)
         return memory_dir
 

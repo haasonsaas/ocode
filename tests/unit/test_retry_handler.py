@@ -3,19 +3,20 @@ Tests for the retry handler utility.
 """
 
 import asyncio
-import pytest
 from unittest.mock import patch
 
+import pytest
+
 from ocode_python.utils.retry_handler import (
-    RetryConfig,
-    RetryError,
-    retry_sync,
-    retry_async,
-    with_retry,
-    with_retry_async,
-    NETWORK_RETRY,
     API_RETRY,
     FILE_RETRY,
+    NETWORK_RETRY,
+    RetryConfig,
+    RetryError,
+    retry_async,
+    retry_sync,
+    with_retry,
+    with_retry_async,
 )
 
 
@@ -40,7 +41,7 @@ class TestRetryConfig:
             max_delay=30.0,
             exponential_base=1.5,
             jitter=False,
-            retryable_exceptions=(ValueError, ConnectionError)
+            retryable_exceptions=(ValueError, ConnectionError),
         )
         assert config.max_attempts == 5
         assert config.base_delay == 0.5
@@ -52,7 +53,7 @@ class TestRetryConfig:
     def test_calculate_delay(self):
         """Test delay calculation."""
         config = RetryConfig(base_delay=1.0, exponential_base=2.0, jitter=False)
-        
+
         # Test exponential backoff
         assert config.calculate_delay(0) == 1.0  # 1.0 * (2^0)
         assert config.calculate_delay(1) == 2.0  # 1.0 * (2^1)
@@ -60,8 +61,10 @@ class TestRetryConfig:
 
     def test_calculate_delay_with_max(self):
         """Test delay calculation with max_delay limit."""
-        config = RetryConfig(base_delay=1.0, exponential_base=2.0, max_delay=3.0, jitter=False)
-        
+        config = RetryConfig(
+            base_delay=1.0, exponential_base=2.0, max_delay=3.0, jitter=False
+        )
+
         assert config.calculate_delay(0) == 1.0
         assert config.calculate_delay(1) == 2.0
         assert config.calculate_delay(2) == 3.0  # Capped at max_delay
@@ -70,7 +73,7 @@ class TestRetryConfig:
     def test_calculate_delay_with_jitter(self):
         """Test delay calculation with jitter."""
         config = RetryConfig(base_delay=2.0, exponential_base=2.0, jitter=True)
-        
+
         # With jitter, delay should be between 50%-100% of calculated value
         delay = config.calculate_delay(1)  # Base would be 4.0
         assert 2.0 <= delay <= 4.0
@@ -78,17 +81,16 @@ class TestRetryConfig:
     def test_should_retry(self):
         """Test retry decision logic."""
         config = RetryConfig(
-            max_attempts=3,
-            retryable_exceptions=(ValueError, ConnectionError)
+            max_attempts=3, retryable_exceptions=(ValueError, ConnectionError)
         )
-        
+
         # Should retry for retryable exceptions within max attempts
         assert config.should_retry(ValueError("test"), 0) is True
         assert config.should_retry(ConnectionError("test"), 1) is True
-        
+
         # Should not retry for non-retryable exceptions
         assert config.should_retry(TypeError("test"), 0) is False
-        
+
         # Should not retry if max attempts reached
         assert config.should_retry(ValueError("test"), 3) is False
 
@@ -99,13 +101,13 @@ class TestRetrySyncDecorator:
     def test_successful_function(self):
         """Test function that succeeds on first try."""
         call_count = 0
-        
+
         @retry_sync(max_attempts=3)
         def success_func():
             nonlocal call_count
             call_count += 1
             return "success"
-        
+
         result = success_func()
         assert result == "success"
         assert call_count == 1
@@ -113,7 +115,7 @@ class TestRetrySyncDecorator:
     def test_function_succeeds_after_retries(self):
         """Test function that succeeds after some failures."""
         call_count = 0
-        
+
         @retry_sync(max_attempts=3, base_delay=0.01)  # Fast for testing
         def flaky_func():
             nonlocal call_count
@@ -121,7 +123,7 @@ class TestRetrySyncDecorator:
             if call_count < 3:
                 raise ConnectionError("temporary failure")
             return "success"
-        
+
         result = flaky_func()
         assert result == "success"
         assert call_count == 3
@@ -129,16 +131,16 @@ class TestRetrySyncDecorator:
     def test_function_fails_all_attempts(self):
         """Test function that fails all retry attempts."""
         call_count = 0
-        
+
         @retry_sync(max_attempts=3, base_delay=0.01)
         def failing_func():
             nonlocal call_count
             call_count += 1
             raise ConnectionError("persistent failure")
-        
+
         with pytest.raises(RetryError) as exc_info:
             failing_func()
-        
+
         assert call_count == 3
         assert "failed after 3 attempts" in str(exc_info.value)
         assert isinstance(exc_info.value.last_exception, ConnectionError)
@@ -147,35 +149,32 @@ class TestRetrySyncDecorator:
     def test_non_retryable_exception(self):
         """Test that non-retryable exceptions are not retried."""
         call_count = 0
-        
-        @retry_sync(
-            max_attempts=3,
-            retryable_exceptions=(ConnectionError,)
-        )
+
+        @retry_sync(max_attempts=3, retryable_exceptions=(ConnectionError,))
         def func_with_non_retryable_error():
             nonlocal call_count
             call_count += 1
             raise ValueError("not retryable")
-        
+
         with pytest.raises(RetryError):
             func_with_non_retryable_error()
-        
+
         assert call_count == 1  # Should not retry
 
     def test_on_retry_callback(self):
         """Test the on_retry callback functionality."""
         retry_calls = []
-        
+
         def on_retry_callback(exception, attempt, delay):
             retry_calls.append((str(exception), attempt, delay))
-        
+
         @retry_sync(max_attempts=3, base_delay=0.01, on_retry=on_retry_callback)
         def failing_func():
             raise ConnectionError("test error")
-        
+
         with pytest.raises(RetryError):
             failing_func()
-        
+
         assert len(retry_calls) == 2  # 2 retries for 3 total attempts
         assert retry_calls[0][0] == "test error"
         assert retry_calls[0][1] == 1  # First retry
@@ -189,13 +188,13 @@ class TestRetryAsyncDecorator:
     async def test_successful_async_function(self):
         """Test async function that succeeds on first try."""
         call_count = 0
-        
+
         @retry_async(max_attempts=3)
         async def success_func():
             nonlocal call_count
             call_count += 1
             return "success"
-        
+
         result = await success_func()
         assert result == "success"
         assert call_count == 1
@@ -204,7 +203,7 @@ class TestRetryAsyncDecorator:
     async def test_async_function_succeeds_after_retries(self):
         """Test async function that succeeds after some failures."""
         call_count = 0
-        
+
         @retry_async(max_attempts=3, base_delay=0.01)
         async def flaky_func():
             nonlocal call_count
@@ -212,7 +211,7 @@ class TestRetryAsyncDecorator:
             if call_count < 3:
                 raise ConnectionError("temporary failure")
             return "success"
-        
+
         result = await flaky_func()
         assert result == "success"
         assert call_count == 3
@@ -221,30 +220,31 @@ class TestRetryAsyncDecorator:
     async def test_async_function_fails_all_attempts(self):
         """Test async function that fails all retry attempts."""
         call_count = 0
-        
+
         @retry_async(max_attempts=3, base_delay=0.01)
         async def failing_func():
             nonlocal call_count
             call_count += 1
             raise ConnectionError("persistent failure")
-        
+
         with pytest.raises(RetryError) as exc_info:
             await failing_func()
-        
+
         assert call_count == 3
         assert "failed after 3 attempts" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_async_sleep_called(self):
         """Test that asyncio.sleep is called during retries."""
-        with patch('asyncio.sleep') as mock_sleep:
+        with patch("asyncio.sleep") as mock_sleep:
+
             @retry_async(max_attempts=2, base_delay=1.0, jitter=False)
             async def failing_func():
                 raise ConnectionError("test")
-            
+
             with pytest.raises(RetryError):
                 await failing_func()
-            
+
             mock_sleep.assert_called_once_with(1.0)
 
 
@@ -253,35 +253,39 @@ class TestWithRetryFunctions:
 
     def test_with_retry_success(self):
         """Test with_retry utility function with successful operation."""
+
         def success_func(value):
             return value * 2
-        
+
         result = with_retry(success_func, NETWORK_RETRY, 5)
         assert result == 10
 
     def test_with_retry_failure(self):
         """Test with_retry utility function with failing operation."""
+
         def failing_func():
             raise ConnectionError("network error")
-        
+
         with pytest.raises(RetryError):
             with_retry(failing_func, NETWORK_RETRY)
 
     @pytest.mark.asyncio
     async def test_with_retry_async_success(self):
         """Test with_retry_async utility function with successful operation."""
+
         async def success_func(value):
             return value * 2
-        
+
         result = await with_retry_async(success_func, API_RETRY, 5)
         assert result == 10
 
     @pytest.mark.asyncio
     async def test_with_retry_async_failure(self):
         """Test with_retry_async utility function with failing operation."""
+
         async def failing_func():
             raise ConnectionError("network error")
-        
+
         with pytest.raises(RetryError):
             await with_retry_async(failing_func, API_RETRY)
 
@@ -321,12 +325,8 @@ class TestRetryError:
     def test_retry_error_attributes(self):
         """Test RetryError exception attributes."""
         original_error = ConnectionError("original")
-        retry_error = RetryError(
-            "Function failed after 3 attempts",
-            original_error,
-            3
-        )
-        
+        retry_error = RetryError("Function failed after 3 attempts", original_error, 3)
+
         assert str(retry_error) == "Function failed after 3 attempts"
         assert retry_error.last_exception is original_error
         assert retry_error.attempts == 3
@@ -337,10 +337,11 @@ class TestEdgeCases:
 
     def test_zero_max_attempts(self):
         """Test behavior with zero max attempts."""
+
         @retry_sync(max_attempts=0)
         def test_func():
             return "should not run"
-        
+
         with pytest.raises(RetryError):
             test_func()
 
@@ -355,27 +356,28 @@ class TestEdgeCases:
     async def test_async_exception_during_sleep(self):
         """Test handling of exceptions during async sleep."""
         call_count = 0
-        
+
         async def mock_sleep(delay):
             raise asyncio.CancelledError("sleep cancelled")
-        
-        with patch('asyncio.sleep', side_effect=mock_sleep):
+
+        with patch("asyncio.sleep", side_effect=mock_sleep):
+
             @retry_async(max_attempts=2, base_delay=0.1)
             async def failing_func():
                 nonlocal call_count
                 call_count += 1
                 raise ConnectionError("test")
-            
+
             with pytest.raises(asyncio.CancelledError):
                 await failing_func()
-            
+
             # Should have tried once before the sleep error
             assert call_count == 1
 
     def test_function_with_args_and_kwargs(self):
         """Test retry decorator with functions that have arguments."""
         call_count = 0
-        
+
         @retry_sync(max_attempts=2, base_delay=0.01)
         def func_with_args(a, b, c=None):
             nonlocal call_count
@@ -383,7 +385,7 @@ class TestEdgeCases:
             if call_count == 1:
                 raise ConnectionError("first attempt")
             return f"{a}-{b}-{c}"
-        
+
         result = func_with_args("x", "y", c="z")
         assert result == "x-y-z"
         assert call_count == 2

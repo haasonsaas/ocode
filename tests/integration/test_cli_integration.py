@@ -66,14 +66,14 @@ class TestCLIIntegration:
         mock_engine.return_value = mock_engine_instance
 
         runner = CliRunner()
-        
+
         # Create a config file to avoid onboarding prompt
         with runner.isolated_filesystem():
             config_dir = Path.home() / ".ocode"
             config_dir.mkdir(exist_ok=True)
             config_file = config_dir / "config.json"
             config_file.write_text('{"model": "test"}')
-            
+
             result = runner.invoke(cli, ["-p", "Hello, world!"])
 
             # Check exit code - should be 0 for successful completion

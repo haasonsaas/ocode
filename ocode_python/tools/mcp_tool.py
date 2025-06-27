@@ -7,8 +7,8 @@ import json
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from ..utils.timeout_handler import TimeoutError, with_timeout
 from ..utils.retry_handler import retry_async
+from ..utils.timeout_handler import TimeoutError, with_timeout
 from .base import (
     ErrorHandler,
     ErrorType,
@@ -199,7 +199,7 @@ class MCPTool(Tool):
             @retry_async(
                 max_attempts=3,
                 base_delay=1.0,
-                retryable_exceptions=(ConnectionError, OSError, TimeoutError)
+                retryable_exceptions=(ConnectionError, OSError, TimeoutError),
             )
             async def _perform_connection():
                 connection_info = {
@@ -487,11 +487,13 @@ class MCPTool(Tool):
             @retry_async(
                 max_attempts=2,
                 base_delay=0.5,
-                retryable_exceptions=(ConnectionError, OSError, TimeoutError)
+                retryable_exceptions=(ConnectionError, OSError, TimeoutError),
             )
             async def _execute_tool():
-                return await self._simulate_tool_call(server_name, tool_name, tool_arguments)
-            
+                return await self._simulate_tool_call(
+                    server_name, tool_name, tool_arguments
+                )
+
             result = await with_timeout(
                 _execute_tool(),
                 timeout=timeout,
