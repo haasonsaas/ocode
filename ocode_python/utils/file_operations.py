@@ -534,6 +534,10 @@ def is_file_locked(file_path: Union[str, Path]) -> bool:
     if os.name != "nt":
         return False  # Not applicable on non-Windows systems
 
+    # Check if file exists first
+    if not os.path.exists(file_path):
+        return False  # File doesn't exist, so it can't be locked
+
     try:
         # Try to open file in exclusive mode
         with open(file_path, "r+"):
