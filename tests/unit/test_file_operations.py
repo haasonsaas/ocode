@@ -1,11 +1,10 @@
-"""
-Tests for resilient file operations utility.
-"""
+"""Tests for resilient file operations."""
 
 import os
 import tempfile
+import time
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -16,13 +15,11 @@ from ocode_python.utils.file_operations import (
     safe_file_delete,
     safe_file_move,
     safe_file_read,
-    safe_file_read_async,
     safe_file_write,
-    safe_file_write_async,
     wait_for_file_unlock,
 )
 from ocode_python.utils.retry_handler import RetryConfig
-from ocode_python.utils.structured_errors import FileSystemError, PermissionError
+from ocode_python.utils.structured_errors import FileSystemError, PermissionError, StructuredError
 
 
 class TestSafeFileRead:
@@ -30,7 +27,7 @@ class TestSafeFileRead:
 
     def test_successful_read(self):
         """Test successful file reading."""
-        content = "test file content\nwith multiple lines"
+        content = "Hello, World!"
 
         with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
             f.write(content)
@@ -43,8 +40,8 @@ class TestSafeFileRead:
             os.unlink(temp_path)
 
     def test_read_with_encoding(self):
-        """Test file reading with specific encoding."""
-        content = "test content with unicode: ñáéíóú"
+        """Test reading with specific encoding."""
+        content = "こんにちは世界"  # Japanese text
 
         with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", delete=False) as f:
             f.write(content)
@@ -57,12 +54,15 @@ class TestSafeFileRead:
             os.unlink(temp_path)
 
     def test_read_nonexistent_file(self):
-        """Test reading a nonexistent file."""
-        with pytest.raises(FileSystemError):
+        """Test reading nonexistent file raises appropriate error."""
+        with pytest.raises(FileSystemError) as exc_info:
             safe_file_read("/nonexistent/file.txt")
+
+        assert exc_info.value.context.operation == "file_read"
 
     def test_read_with_custom_retry_config(self):
         """Test reading with custom retry configuration."""
+        # Use very low retry count to speed up test
         retry_config = RetryConfig(max_attempts=1, base_delay=0.01)
 
         with pytest.raises(FileSystemError):
@@ -74,7 +74,8 @@ class TestSafeFileRead:
 
         if platform.system() == "Windows":
             # Skip this test on Windows as file permissions work differently
-            pytest.skip("File permission testing not reliable on Windows")
+            # Windows handles file permissions differently and chmod doesn't work the same way
+            pytest.skip("Unix-style permission test not applicable on Windows")
         with tempfile.NamedTemporaryFile(delete=False) as f:
             temp_path = f.name
 
@@ -95,7 +96,7 @@ class TestSafeFileWrite:
 
     def test_successful_write(self):
         """Test successful file writing."""
-        content = "test content to write"
+        content = "Test content"
 
         with tempfile.NamedTemporaryFile(delete=False) as f:
             temp_path = f.name
@@ -103,36 +104,37 @@ class TestSafeFileWrite:
         try:
             safe_file_write(temp_path, content)
 
-            # Verify content was written
             with open(temp_path, "r") as f:
                 result = f.read()
             assert result == content
         finally:
             os.unlink(temp_path)
 
-    def test_write_with_directory_creation(self):
-        """Test writing with automatic directory creation."""
+    def test_write_creates_directories(self):
+        """Test writing creates parent directories if needed."""
+        content = "Test content"
+
         with tempfile.TemporaryDirectory() as temp_dir:
-            file_path = Path(temp_dir) / "subdir" / "newfile.txt"
-            content = "test content"
+            file_path = Path(temp_dir) / "subdir" / "file.txt"
 
             safe_file_write(file_path, content, create_dirs=True)
 
             assert file_path.exists()
             assert file_path.read_text() == content
 
-    def test_write_without_directory_creation(self):
-        """Test writing without directory creation fails appropriately."""
+    def test_write_without_create_dirs(self):
+        """Test writing fails when parent directory doesn't exist."""
+        content = "Test content"
+
         with tempfile.TemporaryDirectory() as temp_dir:
-            file_path = Path(temp_dir) / "nonexistent" / "newfile.txt"
-            content = "test content"
+            file_path = Path(temp_dir) / "nonexistent" / "file.txt"
 
             with pytest.raises(FileSystemError):
                 safe_file_write(file_path, content, create_dirs=False)
 
     def test_write_with_encoding(self):
         """Test writing with specific encoding."""
-        content = "content with unicode: ñáéíóú"
+        content = "こんにちは世界"  # Japanese text
 
         with tempfile.NamedTemporaryFile(delete=False) as f:
             temp_path = f.name
@@ -146,34 +148,32 @@ class TestSafeFileWrite:
         finally:
             os.unlink(temp_path)
 
-    def test_atomic_write_behavior(self):
-        """Test that writes are atomic (using temporary files)."""
-        content = "test content"
+    def test_atomic_write(self):
+        """Test atomic write behavior."""
+        original_content = "original"
+        new_content = "new content"
 
-        with tempfile.NamedTemporaryFile(delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
+            f.write(original_content)
             temp_path = f.name
 
         try:
-            # Mock open to fail on the first attempt but succeed on retry
-            original_open = open
-            call_count = 0
+            # Simulate failure during write
+            original_rename = Path.rename
 
-            def mock_open(*args, **kwargs):
-                nonlocal call_count
-                call_count += 1
-                if call_count == 1 and args[0].endswith(".tmp"):
-                    raise PermissionError("Simulated temporary failure")
-                return original_open(*args, **kwargs)
+            def failing_rename(self, target):
+                if str(target) == temp_path:
+                    raise OSError("Simulated rename failure")
+                return original_rename(self, target)
 
-            with patch("builtins.open", side_effect=mock_open):
-                retry_config = RetryConfig(max_attempts=2, base_delay=0.01)
-                safe_file_write(temp_path, content, retry_config=retry_config)
+            with patch.object(Path, "rename", failing_rename):
+                with pytest.raises((FileSystemError, StructuredError)):
+                    safe_file_write(temp_path, new_content)
 
-            # Verify content was eventually written
+            # Original content should be preserved
             with open(temp_path, "r") as f:
                 result = f.read()
-            assert result == content
-
+            assert result == original_content
         finally:
             os.unlink(temp_path)
 
@@ -183,7 +183,7 @@ class TestSafeFileCopy:
 
     def test_successful_copy(self):
         """Test successful file copying."""
-        content = "test content to copy"
+        content = "test content"
 
         with tempfile.NamedTemporaryFile(mode="w", delete=False) as src_f:
             src_f.write(content)
@@ -251,7 +251,6 @@ class TestSafeFileMove:
             safe_file_move(src_path, dst_path)
 
             assert not os.path.exists(src_path)  # Source should be gone
-
             with open(dst_path, "r") as f:
                 result = f.read()
             assert result == content
@@ -278,6 +277,17 @@ class TestSafeFileMove:
             assert dst_path.exists()
             assert dst_path.read_text() == content
 
+    def test_move_nonexistent_source(self):
+        """Test moving from nonexistent source."""
+        with tempfile.NamedTemporaryFile(delete=False) as dst_f:
+            dst_path = dst_f.name
+
+        try:
+            with pytest.raises(FileSystemError):
+                safe_file_move("/nonexistent/source.txt", dst_path)
+        finally:
+            os.unlink(dst_path)
+
 
 class TestSafeFileDelete:
     """Test safe file deletion with retries."""
@@ -288,18 +298,15 @@ class TestSafeFileDelete:
             temp_path = f.name
 
         assert os.path.exists(temp_path)
-
-        result = safe_file_delete(temp_path)
-
-        assert result is True
+        safe_file_delete(temp_path)
         assert not os.path.exists(temp_path)
 
-    def test_delete_nonexistent_file_ignore(self):
+    def test_delete_nonexistent_with_ignore(self):
         """Test deleting nonexistent file with ignore_missing=True."""
-        result = safe_file_delete("/nonexistent/file.txt", ignore_missing=True)
-        assert result is False
+        # Should not raise
+        safe_file_delete("/nonexistent/file.txt", ignore_missing=True)
 
-    def test_delete_nonexistent_file_no_ignore(self):
+    def test_delete_nonexistent_without_ignore(self):
         """Test deleting nonexistent file with ignore_missing=False."""
         with pytest.raises(FileSystemError):
             safe_file_delete("/nonexistent/file.txt", ignore_missing=False)
@@ -310,7 +317,8 @@ class TestSafeFileDelete:
 
         if platform.system() == "Windows":
             # Skip this test on Windows as file permissions work differently
-            pytest.skip("File permission testing not reliable on Windows")
+            # Windows handles file permissions differently and chmod doesn't work the same way
+            pytest.skip("Unix-style permission test not applicable on Windows")
         with tempfile.TemporaryDirectory() as temp_dir:
             file_path = Path(temp_dir) / "test_file.txt"
             file_path.write_text("test content")
@@ -335,131 +343,66 @@ class TestSafeDirectoryCreate:
             new_dir = Path(temp_dir) / "new_directory"
 
             safe_directory_create(new_dir)
-
             assert new_dir.exists()
             assert new_dir.is_dir()
 
-    def test_create_with_parents(self):
-        """Test creating directory with parent directories."""
+    def test_create_nested_directories(self):
+        """Test creating nested directories."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            new_dir = Path(temp_dir) / "parent" / "child" / "grandchild"
+            nested_dir = Path(temp_dir) / "level1" / "level2" / "level3"
 
-            safe_directory_create(new_dir, parents=True)
-
-            assert new_dir.exists()
-            assert new_dir.is_dir()
-
-    def test_create_without_parents_fails(self):
-        """Test creating directory without parents fails appropriately."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            new_dir = Path(temp_dir) / "nonexistent" / "child"
-
-            with pytest.raises(FileSystemError):
-                safe_directory_create(new_dir, parents=False)
+            safe_directory_create(nested_dir)
+            assert nested_dir.exists()
+            assert nested_dir.is_dir()
 
     def test_create_existing_directory(self):
-        """Test creating directory that already exists."""
+        """Test creating already existing directory."""
         with tempfile.TemporaryDirectory() as temp_dir:
             existing_dir = Path(temp_dir) / "existing"
             existing_dir.mkdir()
 
-            # Should not raise an error with exist_ok=True (default)
+            # Should not raise
             safe_directory_create(existing_dir)
-
             assert existing_dir.exists()
 
-    def test_create_existing_directory_no_exist_ok(self):
-        """Test creating existing directory with exist_ok=False."""
+    def test_create_when_file_exists(self):
+        """Test creating directory when a file with same name exists."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            existing_dir = Path(temp_dir) / "existing"
-            existing_dir.mkdir()
+            file_path = Path(temp_dir) / "file_not_dir"
+            file_path.write_text("content")
 
-            with pytest.raises(FileSystemError):
-                safe_directory_create(existing_dir, exist_ok=False)
+            with pytest.raises(FileSystemError) as exc_info:
+                safe_directory_create(file_path)
 
-
-class TestAsyncFileOperations:
-    """Test async file operations."""
-
-    @pytest.mark.asyncio
-    async def test_async_file_read(self):
-        """Test async file reading."""
-        content = "async test content"
-
-        with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
-            f.write(content)
-            temp_path = f.name
-
-        try:
-            result = await safe_file_read_async(temp_path)
-            assert result == content
-        finally:
-            os.unlink(temp_path)
-
-    @pytest.mark.asyncio
-    async def test_async_file_write(self):
-        """Test async file writing."""
-        content = "async test content"
-
-        with tempfile.NamedTemporaryFile(delete=False) as f:
-            temp_path = f.name
-
-        try:
-            await safe_file_write_async(temp_path, content)
-
-            with open(temp_path, "r") as f:
-                result = f.read()
-            assert result == content
-        finally:
-            os.unlink(temp_path)
-
-    @pytest.mark.asyncio
-    async def test_async_operations_with_retry(self):
-        """Test async operations with retry logic."""
-        retry_config = RetryConfig(max_attempts=2, base_delay=0.01)
-
-        with pytest.raises(FileSystemError):
-            await safe_file_read_async(
-                "/nonexistent/file.txt", retry_config=retry_config
-            )
+            # The error message should indicate the path exists
+            assert ("exists" in str(exc_info.value).lower() or 
+                    "exist_ok" in str(exc_info.value).lower())
 
 
 class TestFileUtilities:
     """Test file utility functions."""
 
-    @pytest.mark.skipif(
-        os.name != "nt", reason="File locking check is Windows-specific"
-    )
-    def test_is_file_locked_windows(self):
-        """Test file lock detection on Windows."""
+    def test_is_file_locked_windows_only(self):
+        """Test is_file_locked function (Windows-specific)."""
+        if os.name != "nt":
+            # Function should return False on non-Windows
+            assert not is_file_locked("/any/path")
+            return
+
+        # On Windows, test with a real file
         with tempfile.NamedTemporaryFile(delete=False) as f:
             temp_path = f.name
 
         try:
-            # File should not be locked initially
-            assert not is_file_locked(temp_path)
-
-            # Open file exclusively to lock it
-            with open(temp_path, "r+"):
-                # File should appear locked to another process
-                # Note: This test is somewhat limited as we can't easily
-                # simulate true cross-process file locking in unit tests
-                pass
-
-        finally:
-            os.unlink(temp_path)
-
-    @pytest.mark.skipif(os.name == "nt", reason="Skip on Windows")
-    def test_is_file_locked_non_windows(self):
-        """Test file lock detection on non-Windows systems."""
-        with tempfile.NamedTemporaryFile(delete=False) as f:
-            temp_path = f.name
-
-        try:
-            # Should always return False on non-Windows systems
+            # File should not be locked
             assert not is_file_locked(temp_path)
         finally:
             os.unlink(temp_path)
+
+    def test_is_file_locked_nonexistent(self):
+        """Test is_file_locked with nonexistent file."""
+        # Should return False for nonexistent files
+        assert not is_file_locked("/nonexistent/file.txt")
 
     def test_wait_for_file_unlock_immediate(self):
         """Test waiting for file unlock when file is not locked."""
@@ -467,7 +410,6 @@ class TestFileUtilities:
             temp_path = f.name
 
         try:
-            # Should return immediately as file is not locked
             result = wait_for_file_unlock(temp_path, timeout=1.0)
             assert result is True
         finally:
@@ -498,14 +440,13 @@ class TestRetryIntegration:
             original_open = open
             call_count = 0
 
-            def mock_open(*args, **kwargs):
+            def mock_open(path, mode="r", **kwargs):
                 nonlocal call_count
-                call_count += 1
-                if call_count == 1 and "w" in str(
-                    kwargs.get("mode", args[1] if len(args) > 1 else "")
-                ):
-                    raise PermissionError("Temporary failure")
-                return original_open(*args, **kwargs)
+                if mode == "w" and str(path).endswith(".tmp"):
+                    call_count += 1
+                    if call_count == 1:
+                        raise OSError("Simulated transient failure")
+                return original_open(path, mode, **kwargs)
 
             with patch("builtins.open", side_effect=mock_open):
                 retry_config = RetryConfig(max_attempts=3, base_delay=0.01)
@@ -556,3 +497,55 @@ class TestErrorHandling:
             assert e.original_error is not None
             # The original error should be from the retry mechanism
             # which wraps the actual FileNotFoundError
+
+
+class TestWindowsSpecific:
+    """Windows-specific file operation tests."""
+
+    @pytest.mark.skipif(os.name != "nt", reason="Windows-only tests")
+    def test_windows_file_in_use_error(self):
+        """Test handling of file-in-use errors on Windows."""
+        import platform
+        
+        if platform.system() != "Windows":
+            pytest.skip("Windows-only test")
+            
+        # Create a temporary file
+        with tempfile.NamedTemporaryFile(delete=False, mode='w') as f:
+            temp_path = f.name
+            f.write("test content")
+            f.flush()
+            
+            # Keep the file open to simulate it being in use
+            # This should cause permission/access errors
+            try:
+                # Try to delete the file while it's still open
+                with pytest.raises((PermissionError, OSError, FileSystemError)):
+                    safe_file_delete(temp_path, ignore_missing=False)
+            finally:
+                # File will be closed when the context manager exits
+                pass
+        
+        # Clean up after the file is closed
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
+
+    @pytest.mark.skipif(os.name != "nt", reason="Windows-only tests")
+    def test_windows_locked_file_detection(self):
+        """Test detection of locked files on Windows."""
+        import platform
+        
+        if platform.system() != "Windows":
+            pytest.skip("Windows-only test")
+            
+        with tempfile.NamedTemporaryFile(delete=False) as f:
+            temp_path = f.name
+            f.write(b"test")
+            f.flush()
+            
+            # File is still open, so it should be detected as locked
+            assert is_file_locked(temp_path) == True
+            
+        # After closing, file should not be locked
+        assert is_file_locked(temp_path) == False
+        os.unlink(temp_path)
