@@ -8,8 +8,7 @@ reset, and stash functionality with structured output support.
 import contextlib
 import json
 import os
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict
 
 from git import InvalidGitRepositoryError, Repo
 from git.exc import GitCommandError
@@ -346,7 +345,8 @@ class GitCloneTool(Tool):
                 ToolParameter(
                     name="depth",
                     type="number",
-                    description="Create a shallow clone with history truncated to specified number of commits",
+                    description="Create a shallow clone with history "
+                    "truncated to specified number of commits",
                     required=False,
                 ),
             ],
@@ -479,7 +479,8 @@ class GitResetTool(Tool):
                 output_lines = [
                     f"DRY RUN: Would reset ({mode}) to {target_commit.hexsha[:8]}",
                     f"Current commit: {current_commit}",
-                    f"Target commit: {target_commit.hexsha[:8]} - {str(target_commit.summary)}",
+                    f"Target commit: {target_commit.hexsha[:8]} - "
+                    f"{str(target_commit.summary)}",
                 ]
 
                 # Show what would be affected
@@ -545,7 +546,8 @@ class GitStashTool(Tool):
                 ToolParameter(
                     name="action",
                     type="string",
-                    description="Action: 'save', 'list', 'pop', 'apply', 'drop', 'clear'",
+                    description="Action: 'save', 'list', 'pop', "
+                    "'apply', 'drop', 'clear'",
                     required=True,
                 ),
                 ToolParameter(
@@ -689,7 +691,8 @@ class GitStashTool(Tool):
                 return ToolResult(
                     success=False,
                     output="",
-                    error=f"Invalid action: {action}. Use 'save', 'list', 'pop', 'apply', 'drop', or 'clear'",
+                    error=f"Invalid action: {action}. Use 'save', 'list', "
+                    f"'pop', 'apply', 'drop', or 'clear'",
                 )
 
         except InvalidGitRepositoryError:
@@ -809,7 +812,8 @@ class GitStatusJSONTool(Tool):
                 # Format as text
                 lines = [
                     f"Branch: {status_data['branch']}",
-                    f"Commit: {status_data['commit_short']} - {str(status_data['commit_message'])}",
+                    f"Commit: {status_data['commit_short']} - "
+                    f"{str(status_data['commit_message'])}",
                     f"Author: {status_data['author']}",
                     "",
                 ]

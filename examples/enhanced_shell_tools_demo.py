@@ -16,8 +16,9 @@ from pathlib import Path
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from ocode_python.tools.shell_tools_enhanced import EnhancedShellCommandTool
-from ocode_python.tools.shell_tools_migration import (
+# Imports after path setup
+from ocode_python.tools.shell_tools_enhanced import EnhancedShellCommandTool  # noqa: E402
+from ocode_python.tools.shell_tools_migration import (  # noqa: E402
     MigrationShellCommandTool,
     ShellToolsMigrationHelper,
 )

@@ -351,14 +351,16 @@ class FileWriteTool(Tool):
                 ToolParameter(
                     name="atomic",
                     type="boolean",
-                    description="Use atomic write operation (safer but incompatible with append)",
+                    description="Use atomic write operation "
+                    "(safer but incompatible with append)",
                     required=False,
                     default=True,
                 ),
                 ToolParameter(
                     name="backup",
                     type="boolean",
-                    description="Create backup of existing file when using atomic write",
+                    description="Create backup of existing file "
+                    "when using atomic write",
                     required=False,
                     default=True,
                 ),

@@ -133,10 +133,12 @@ class TestEnhancedShellCommandTool:
 
         # Generate output larger than limit using safe command
         if platform.system() == "Windows":
-            cmd = "for /L %i in (1,1,100000) do @echo This is a very long line that will exceed the output limit when repeated many times"
+            cmd = ("for /L %i in (1,1,100000) do @echo This is a very long line "
+                   "that will exceed the output limit when repeated many times")
         else:
             # Use yes command with timeout to generate lots of output
-            cmd = "yes 'This is a very long line that will exceed the output limit when repeated many times' | head -n 100000"
+            cmd = ("yes 'This is a very long line that will exceed the output "
+                   "limit when repeated many times' | head -n 100000")
 
         result = await tool.execute(
             command=cmd,

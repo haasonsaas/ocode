@@ -8,7 +8,7 @@ data loss and corruption during write operations.
 import os
 import tempfile
 from pathlib import Path
-from typing import Any, Callable, IO, Optional, Tuple, Union
+from typing import IO, Any, Callable, Optional, Tuple, Union
 
 
 class AtomicFileWriter:

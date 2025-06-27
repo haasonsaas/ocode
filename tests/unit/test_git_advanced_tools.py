@@ -450,7 +450,8 @@ class TestGitStashTool:
         with patch("ocode_python.tools.git_advanced_tools.Repo") as mock_repo_class:
             mock_repo = MagicMock()
             mock_repo_class.return_value = mock_repo
-            stash_list = "stash@{0}: WIP on main: abc123 Test commit\nstash@{1}: On feature: def456 Another commit"
+            stash_list = ("stash@{0}: WIP on main: abc123 Test commit\n"
+                         "stash@{1}: On feature: def456 Another commit")
             mock_repo.git.stash.return_value = stash_list
 
             result = await tool.execute(path=".", action="list")

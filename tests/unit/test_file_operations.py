@@ -78,7 +78,8 @@ class TestSafeFileRead:
 
         if platform.system() == "Windows":
             # Skip this test on Windows as file permissions work differently
-            # Windows handles file permissions differently and chmod doesn't work the same way
+            # Windows handles file permissions differently and chmod doesn't
+            # work the same way
             pytest.skip("Unix-style permission test not applicable on Windows")
         with tempfile.NamedTemporaryFile(delete=False) as f:
             temp_path = f.name
@@ -321,7 +322,8 @@ class TestSafeFileDelete:
 
         if platform.system() == "Windows":
             # Skip this test on Windows as file permissions work differently
-            # Windows handles file permissions differently and chmod doesn't work the same way
+            # Windows handles file permissions differently and chmod doesn't
+            # work the same way
             pytest.skip("Unix-style permission test not applicable on Windows")
         with tempfile.TemporaryDirectory() as temp_dir:
             file_path = Path(temp_dir) / "test_file.txt"
