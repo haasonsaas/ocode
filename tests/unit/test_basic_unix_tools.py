@@ -290,9 +290,17 @@ class TestCurlTool:
         if not result.success:
             # Check for common network failure indicators
             error_msg = result.error.lower()
-            assert any(keyword in error_msg for keyword in [
-                "error", "failed", "connection", "network", "timeout", "unreachable"
-            ])
+            assert any(
+                keyword in error_msg
+                for keyword in [
+                    "error",
+                    "failed",
+                    "connection",
+                    "network",
+                    "timeout",
+                    "unreachable",
+                ]
+            )
 
 
 class TestWhichTool:
