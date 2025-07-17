@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/haasonsaas-ocode-badge.png)](https://mseep.ai/app/haasonsaas-ocode)
+
 # OCode - Terminal-Native AI Coding Assistant
 
 > **Powered by Ollama Models**
