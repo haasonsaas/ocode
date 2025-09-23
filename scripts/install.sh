@@ -208,40 +208,129 @@ fi
 
 # Check for Ollama
 echo "🔍 Checking for Ollama..."
-if command -v ollama &> /dev/null; then
-    echo "✅ Ollama found"
 
-    # Check if Ollama is running
-    if ! ollama list &> /dev/null; then
-        echo "⚠️  Ollama is not running. Starting Ollama service..."
-        if command -v systemctl &> /dev/null; then
-            sudo systemctl enable ollama
-            sudo systemctl start ollama
-        else
-            echo "Please start Ollama manually: ollama serve"
+# Initialize variables
+OLLAMA_AVAILABLE=false
+OLLAMA_LOCATION=""
+
+# Try remote Ollama first if OLLAMA_HOST is set
+if [ -n "$OLLAMA_HOST" ]; then
+    print_status "Found OLLAMA_HOST environment variable: $OLLAMA_HOST"
+
+    # Test connection to remote Ollama using API
+    if curl -s --connect-timeout 5 "$OLLAMA_HOST/api/version" &> /dev/null; then
+        echo "✅ Ollama found at $OLLAMA_HOST"
+
+        # Check if default models exist on remote host using API
+        echo "🔍 Checking for default models on remote Ollama..."
+        MODELS_RESPONSE=$(curl -s "$OLLAMA_HOST/api/tags" 2>/dev/null)
+        MODELS_EXIST=false
+
+        if echo "$MODELS_RESPONSE" | grep -q "llama3:8b" && echo "$MODELS_RESPONSE" | grep -q "MFDoom/deepseek-coder-v2-tool-calling:latest"; then
+            MODELS_EXIST=true
         fi
-    fi
 
-    # Pull default model
+        if [ "$MODELS_EXIST" = true ]; then
+            echo "✅ Default models already available on remote Ollama"
+            OLLAMA_AVAILABLE=true
+            OLLAMA_LOCATION="remote"
+        else
+            echo "📥 Pulling default models to remote Ollama..."
+
+            # Pull default model using API
+            DEFAULT_MODEL_PULLED=false
+            if curl -s -X POST "$OLLAMA_HOST/api/pull" -H "Content-Type: application/json" -d '{"name":"llama3:8b"}' &> /dev/null; then
+                echo "✅ Pulled llama3:8b to remote Ollama"
+                DEFAULT_MODEL_PULLED=true
+            else
+                echo "⚠️  Failed to pull llama3:8b to remote Ollama"
+            fi
+
+            # Pull thinking model using API
+            THINKING_MODEL_PULLED=false
+            if [ "$DEFAULT_MODEL_PULLED" = true ]; then
+                if curl -s -X POST "$OLLAMA_HOST/api/pull" -H "Content-Type: application/json" -d '{"name":"MFDoom/deepseek-coder-v2-tool-calling:latest"}' &> /dev/null; then
+                    echo "✅ Pulled thinking model to remote Ollama"
+                    THINKING_MODEL_PULLED=true
+                else
+                    echo "⚠️  Failed to pull thinking model to remote Ollama"
+                fi
+            fi
+
+            if [ "$THINKING_MODEL_PULLED" = true ]; then
+                OLLAMA_AVAILABLE=true
+                OLLAMA_LOCATION="remote"
+            fi
+        fi
+    else
+        echo "⚠️  Cannot connect to Ollama at $OLLAMA_HOST"
+    fi
+fi
+
+# Fall back to local ollama command if remote failed or OLLAMA_HOST not set
+if [ "$OLLAMA_AVAILABLE" = false ]; then
+    if command -v ollama &> /dev/null; then
+        echo "✅ Ollama command found"
+
+        if ollama list &> /dev/null; then
+            echo "✅ Ollama is running locally"
+            OLLAMA_AVAILABLE=true
+            OLLAMA_LOCATION="local"
+        else
+            echo "⚠️  Ollama command found but service is not running"
+            echo "Starting Ollama service..."
+            if command -v systemctl &> /dev/null; then
+                sudo systemctl enable ollama
+                sudo systemctl start ollama
+                # Wait a moment for service to start
+                sleep 2
+                if ollama list &> /dev/null; then
+                    echo "✅ Ollama service started successfully"
+                    OLLAMA_AVAILABLE=true
+                    OLLAMA_LOCATION="local"
+                else
+                    echo "⚠️  Failed to start Ollama service"
+                fi
+            else
+                echo "Please start Ollama manually: ollama serve"
+            fi
+        fi
+    else
+        echo "⚠️  Ollama command not found"
+    fi
+fi
+
+# Handle model pulling for local Ollama (remote models already handled above)
+if [ "$OLLAMA_AVAILABLE" = true ] && [ "$OLLAMA_LOCATION" = "local" ]; then
     echo "📥 Pulling default model (llama3:8b)..."
     if ! ollama pull llama3:8b; then
         echo "⚠️  Failed to pull llama3:8b. You can pull it later with: ollama pull llama3:8b"
     fi
 
-    # Pull thinking model for advanced tool calling
     echo "📥 Pulling thinking model (MFDoom/deepseek-coder-v2-tool-calling:latest)..."
     if ! ollama pull MFDoom/deepseek-coder-v2-tool-calling:latest; then
         echo "⚠️  Failed to pull thinking model. You can pull it later with: ollama pull MFDoom/deepseek-coder-v2-tool-calling:latest"
     fi
-else
-    echo "⚠️  Ollama not found"
-    echo "OCode requires Ollama to function. Please install Ollama:"
-    echo "  • Visit: https://ollama.ai"
+elif [ "$OLLAMA_AVAILABLE" = false ]; then
+    echo "⚠️  Ollama not available"
+    echo "OCode requires Ollama to function. Please:"
+    echo "  • Install Ollama locally: https://ollama.ai"
+    echo "  • Or set OLLAMA_HOST environment variable to point to a remote Ollama instance"
     echo "  • Or run: curl -fsSL https://ollama.ai/install.sh | sh"
 fi
 
 # Create default configuration
 echo "⚙️  Creating default configuration..."
+
+# Determine ollama_host based on successful setup
+if [ "$OLLAMA_AVAILABLE" = true ] && [ "$OLLAMA_LOCATION" = "remote" ]; then
+    OLLAMA_HOST_CONFIG="$OLLAMA_HOST"
+    echo "📡 Using remote Ollama host: $OLLAMA_HOST_CONFIG"
+else
+    OLLAMA_HOST_CONFIG="http://localhost:11434"
+    echo "🏠 Using local Ollama host: $OLLAMA_HOST_CONFIG"
+fi
+
 cat > "$OCODE_DIR/settings.json" << EOF
 {
   "model": "llama3:8b",
@@ -252,6 +341,7 @@ cat > "$OCODE_DIR/settings.json" << EOF
   "output_format": "text",
   "verbose": false,
   "use_ripgrep": true,
+  "ollama_host": "$OLLAMA_HOST_CONFIG",
   "permissions": {
     "allow_file_read": true,
     "allow_file_write": true,
