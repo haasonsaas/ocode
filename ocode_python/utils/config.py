@@ -188,7 +188,7 @@ class ConfigManager:
         """
         result: Dict[str, Any] = {}
 
-        for config in reversed(configs):  # Start with lowest priority
+        for config in configs:
             for key, value in config.items():
                 if (
                     isinstance(value, dict)
