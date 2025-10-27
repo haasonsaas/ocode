@@ -67,7 +67,7 @@ jobs:
         continue-on-error: true
 
       - name: Upload bandit report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: always()
         with:
           name: bandit-report
@@ -78,7 +78,7 @@ jobs:
         continue-on-error: true
 
       - name: Upload safety report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: always()
         with:
           name: safety-report
@@ -171,7 +171,7 @@ jobs:
         run: pytest tests/performance/ -v -m performance
 
       - name: Upload performance results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: always()
         with:
           name: performance-results
@@ -204,7 +204,7 @@ jobs:
         run: python -m twine check dist/*
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: dist
           path: dist/
