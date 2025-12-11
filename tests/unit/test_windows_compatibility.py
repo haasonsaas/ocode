@@ -59,6 +59,8 @@ class TestWindowsCompatibility:
         mock_process.pid = 1234
         mock_process.returncode = 0
         mock_process.communicate.return_value = (b"Hello Windows", b"")
+        mock_process.stdin = MagicMock()
+        mock_process.stdin.is_closing.return_value = True  # avoid cleanup warning
         mock_subprocess.return_value = mock_process
 
         bash_tool = BashTool()
@@ -78,12 +80,12 @@ class TestWindowsCompatibility:
         from ocode_python.tools.bash_tool import _process_manager
 
         # Mock process that needs termination
-        mock_process = AsyncMock()
+        mock_process = MagicMock()
         mock_process.pid = 1234
         mock_process.returncode = None  # Process still running
-        mock_process.terminate.return_value = None
-        mock_process.wait.side_effect = asyncio.TimeoutError()
-        mock_process.kill.return_value = None
+        mock_process.terminate = MagicMock(return_value=None)
+        mock_process.kill = MagicMock(return_value=None)
+        mock_process.wait = AsyncMock(side_effect=asyncio.TimeoutError())
 
         # Test that taskkill is called on Windows
         await _process_manager._terminate_process(mock_process)
@@ -114,12 +116,12 @@ class TestWindowsCompatibility:
         ) as mock_killpg, patch("os.getpgid", return_value=1234):
 
             # Mock process that needs termination
-            mock_process = AsyncMock()
+            mock_process = MagicMock()
             mock_process.pid = 1234
             mock_process.returncode = None  # Process still running
-            mock_process.terminate.return_value = None
-            mock_process.wait.side_effect = asyncio.TimeoutError()
-            mock_process.kill.return_value = None
+            mock_process.terminate = MagicMock(return_value=None)
+            mock_process.kill = MagicMock(return_value=None)
+            mock_process.wait = AsyncMock(side_effect=asyncio.TimeoutError())
 
             # Test that os.killpg is called on Unix
             await _process_manager._terminate_process(mock_process)

@@ -51,6 +51,15 @@ DEFAULT_CONFIG = {
         ".vscode",
     ],
     "mcp_servers": {},
+    "engine": {
+        "temperature": 0.7,
+        "top_p": 0.95,
+        "max_tokens": 32768,
+        "frequency_penalty": 0.0,
+        "presence_penalty": 0.0,
+        "chunk_size": 8192,
+        "max_continuations": 10,
+    },
     "architecture": {
         "enable_advanced_orchestrator": True,
         "enable_stream_processing": True,

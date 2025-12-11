@@ -61,8 +61,8 @@ class OCodeEngine:
         verbose: bool = False,
         root_path: Optional[Path] = None,
         confirmation_callback=None,
-        max_continuations: int = 10,  # Increased default for complex workflows
-        chunk_size: int = 8192,  # Increased default for better performance
+        max_continuations: Optional[int] = None,
+        chunk_size: Optional[int] = None,
     ) -> None:
         """
         Initialize the OCode engine with all necessary components.
@@ -125,6 +125,18 @@ class OCodeEngine:
         # Register all available tools with the registry
         # This makes them available for AI function calling
         self.tool_registry.register_core_tools()
+
+        # Engine tuning options (overridable via config)
+        engine_cfg = self.config.get("engine", {})
+        self.temperature = engine_cfg.get("temperature", 0.7)
+        self.top_p = engine_cfg.get("top_p", 0.95)
+        self.max_tokens = engine_cfg.get("max_tokens", 32768)
+        self.frequency_penalty = engine_cfg.get("frequency_penalty", 0.0)
+        self.presence_penalty = engine_cfg.get("presence_penalty", 0.0)
+        self.chunk_size = chunk_size or engine_cfg.get("chunk_size", 8192)
+        self.max_continuations = (
+            max_continuations if max_continuations is not None else engine_cfg.get("max_continuations", 10)
+        )
 
         # Pre-declare architecture component attributes
         self.orchestrator: Optional[AdvancedOrchestrator] = None
@@ -1362,11 +1374,11 @@ When a user asks you to perform an action, call the appropriate function."""
             stream=True,
             tools=tools,
             options={
-                "temperature": 0.7,
-                "max_tokens": 32768,
-                "top_p": 0.95,
-                "frequency_penalty": 0.0,
-                "presence_penalty": 0.0,
+                "temperature": self.temperature,
+                "max_tokens": self.max_tokens,
+                "top_p": self.top_p,
+                "frequency_penalty": self.frequency_penalty,
+                "presence_penalty": self.presence_penalty,
             },
         )
 
@@ -1385,8 +1397,10 @@ When a user asks you to perform an action, call the appropriate function."""
         chunk_buffer = ""
         continuation_count = 0
         last_response_length = 0
+        allow_continuation = llm_analysis.get("should_use_tools", False)
+        max_continuations = self.max_continuations if allow_continuation else 0
 
-        while continuation_count <= self.max_continuations:
+        while continuation_count <= max_continuations:
             async for chunk in self.api_client.stream_chat(request):
                 if chunk.tool_call:
                     tool_output = await self._handle_tool_call(
@@ -1419,7 +1433,7 @@ When a user asks you to perform an action, call the appropriate function."""
                         total_tokens=total_tokens,
                     )
 
-                    if should_continue and continuation_count < self.max_continuations:
+                    if should_continue and continuation_count < max_continuations:
                         current_length = len(self.current_response)
                         if current_length <= last_response_length + 50:
                             self.response_complete = True
