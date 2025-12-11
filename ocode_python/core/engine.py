@@ -7,7 +7,7 @@ import json
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, AsyncGenerator, Dict, List, Optional
+from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 from ..prompts.prompt_composer import PromptComposer
 from ..tools.base import Tool, ToolRegistry, ToolResult
@@ -1286,7 +1286,7 @@ When a user asks you to perform an action, call the appropriate function."""
         # Default to not continuing
         return False
 
-    def get_context_files(self, limit: int = 10) -> list[tuple[Path, float]]:
+    def get_context_files(self, limit: int = 10) -> List[Tuple[Path, float]]:
         """Return a small set of likely relevant files for UI context.
 
         Uses a lightweight heuristic (recent tracked files) to keep UI snappy.
