@@ -74,7 +74,7 @@ jobs:
           path: bandit-report.json
 
       - name: Check dependencies for known vulnerabilities
-        run: python -m safety check --json --output safety-report.json
+        run: python -m safety check --output json --file safety-report.json
         continue-on-error: true
 
       - name: Upload safety report
