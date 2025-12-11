@@ -145,8 +145,15 @@ class TestOCodeEngine:
         engine = OCodeEngine(model="test-model", root_path=mock_project_dir)
 
         # Mock API client to raise an error
+        class FailingStream:
+            def __aiter__(self):
+                return self
+
+            async def __anext__(self):
+                raise Exception("API error")
+
         engine.api_client = AsyncMock()
-        engine.api_client.stream_chat = AsyncMock(side_effect=Exception("API error"))
+        engine.api_client.stream_chat = lambda _request: FailingStream()
 
         responses = []
         async for response in engine.process("test prompt"):

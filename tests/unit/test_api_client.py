@@ -220,7 +220,15 @@ class TestOllamaAPIClient:
 
         mock_session = AsyncMock()
         mock_session.closed = False
-        mock_session.get = AsyncMock(side_effect=Exception("Connection failed"))
+
+        class FailingContext:
+            async def __aenter__(self):
+                raise aiohttp.ClientError("Connection failed")
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+        mock_session.get = Mock(return_value=FailingContext())
 
         with patch("aiohttp.ClientSession") as mock_client_session:
             mock_client_session.return_value = mock_session
