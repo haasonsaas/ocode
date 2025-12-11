@@ -1,0 +1,44 @@
+/* Minimal theme for the Textual TUI */
+
+$accent: #7dd3fc;
+$surface: #0f172a;
+$surface-alt: #111827;
+$text: #e2e8f0;
+
+Screen {
+  background: $surface;
+  color: $text;
+}
+
+#body {
+  height: 1fr;
+}
+
+#conversation {
+  width: 3fr;
+  border: solid $surface-alt;
+  padding: 1 1;
+}
+
+#context {
+  width: 1.4fr;
+  border: solid $surface-alt;
+  padding: 1 1;
+}
+
+#log {
+  height: 1fr;
+  padding: 0 0;
+}
+
+#prompt {
+  border: solid $accent;
+}
+
+Footer, Header {
+  background: $surface-alt;
+}
+
+.context-visible {
+  display: block;
+}

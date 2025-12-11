@@ -124,6 +124,11 @@ async def cli_confirmation_callback(command: str, reason: str) -> bool:
     is_flag=True,
     help="Run the interactive setup wizard to configure OCode.",
 )
+@click.option(
+    "--tui",
+    is_flag=True,
+    help="Launch the experimental Textual TUI (requires a real terminal).",
+)
 @click.pass_context
 def cli(
     ctx,
@@ -135,6 +140,7 @@ def cli(
     verbose: bool,
     continue_response: bool,
     setup: bool,
+    tui: bool,
 ):
     """
     OCode - Terminal-native AI coding assistant powered by Ollama models.
@@ -182,6 +188,21 @@ def cli(
     if setup:
         # Explicit setup request
         asyncio.run(run_setup_wizard())
+        return
+
+    if tui:
+        try:
+            from ..ui.tui import run_tui
+        except Exception as exc:  # pragma: no cover - defensive import
+            console.print(f"[red]Failed to launch TUI:[/red] {exc}")
+            sys.exit(1)
+
+        engine = OCodeEngine(
+            model=model,
+            output_format=out,
+            verbose=verbose,
+        )
+        run_tui(engine)
         return
 
     # Check for first run and offer onboarding
