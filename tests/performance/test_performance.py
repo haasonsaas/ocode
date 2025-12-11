@@ -120,6 +120,23 @@ class TestPerformance:
         assert len(responses) > 0
 
     @pytest.mark.asyncio
+    async def test_knowledge_only_latency(self, ocode_engine: OCodeEngine):
+        """Ensure knowledge-only responses start quickly."""
+        query = "What is the capital of France?"
+
+        start_time = time.time()
+        responses = []
+        async for chunk in ocode_engine.process(query):
+            responses.append(chunk)
+            if len(responses) >= 2:  # measure time-to-first-few bytes
+                break
+
+        duration = time.time() - start_time
+
+        assert duration < 1.0, f"Knowledge-only response took {duration:.2f}s, expected < 1s"
+        assert len(responses) > 0
+
+    @pytest.mark.asyncio
     async def test_memory_usage(self, mock_project_dir: Path):
         """Test memory usage during processing."""
         import os

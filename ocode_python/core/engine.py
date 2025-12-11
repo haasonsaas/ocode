@@ -45,6 +45,26 @@ class ProcessingMetrics:
         return time.time() - self.start_time
 
 
+@dataclass
+class RequestOptions:
+    """Configurable request tuning parameters."""
+
+    temperature: float = 0.7
+    top_p: float = 0.95
+    max_tokens: int = 32768
+    frequency_penalty: float = 0.0
+    presence_penalty: float = 0.0
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "temperature": self.temperature,
+            "max_tokens": self.max_tokens,
+            "top_p": self.top_p,
+            "frequency_penalty": self.frequency_penalty,
+            "presence_penalty": self.presence_penalty,
+        }
+
+
 class OCodeEngine:
     """
     Main OCode processing engine.
@@ -128,14 +148,18 @@ class OCodeEngine:
 
         # Engine tuning options (overridable via config)
         engine_cfg = self.config.get("engine", {})
-        self.temperature = engine_cfg.get("temperature", 0.7)
-        self.top_p = engine_cfg.get("top_p", 0.95)
-        self.max_tokens = engine_cfg.get("max_tokens", 32768)
-        self.frequency_penalty = engine_cfg.get("frequency_penalty", 0.0)
-        self.presence_penalty = engine_cfg.get("presence_penalty", 0.0)
+        self.request_options = RequestOptions(
+            temperature=engine_cfg.get("temperature", 0.7),
+            top_p=engine_cfg.get("top_p", 0.95),
+            max_tokens=engine_cfg.get("max_tokens", 32768),
+            frequency_penalty=engine_cfg.get("frequency_penalty", 0.0),
+            presence_penalty=engine_cfg.get("presence_penalty", 0.0),
+        )
         self.chunk_size = chunk_size or engine_cfg.get("chunk_size", 8192)
         self.max_continuations = (
-            max_continuations if max_continuations is not None else engine_cfg.get("max_continuations", 10)
+            max_continuations
+            if max_continuations is not None
+            else engine_cfg.get("max_continuations", 10)
         )
 
         # Pre-declare architecture component attributes
@@ -1373,13 +1397,7 @@ When a user asks you to perform an action, call the appropriate function."""
             messages=messages,
             stream=True,
             tools=tools,
-            options={
-                "temperature": self.temperature,
-                "max_tokens": self.max_tokens,
-                "top_p": self.top_p,
-                "frequency_penalty": self.frequency_penalty,
-                "presence_penalty": self.presence_penalty,
-            },
+            options=self.request_options.to_dict(),
         )
 
         return request, tools
