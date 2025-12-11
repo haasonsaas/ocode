@@ -6,6 +6,7 @@ including embedding-based similarity, dynamic context expansion, and dependency
 following.
 """
 
+import asyncio
 import hashlib
 import logging
 import sqlite3

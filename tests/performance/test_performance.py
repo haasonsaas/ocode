@@ -133,7 +133,9 @@ class TestPerformance:
 
         duration = time.time() - start_time
 
-        assert duration < 1.0, f"Knowledge-only response took {duration:.2f}s, expected < 1s"
+        assert (
+            duration < 1.0
+        ), f"Knowledge-only response took {duration:.2f}s, expected < 1s"
         assert len(responses) > 0
 
     @pytest.mark.asyncio
