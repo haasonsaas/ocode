@@ -38,8 +38,8 @@ class TestMemoryTools(unittest.TestCase):
         os.chdir(self.original_cwd)
         shutil.rmtree(self.test_dir, ignore_errors=True)
 
-    async def test_memory_write_persistent(self):
-        """Test writing to persistent memory."""
+    async def _run_memory_write_persistent(self):
+        """Async body for persistent memory write test."""
         tool = MemoryWriteTool()
 
         result = await tool.execute(
@@ -65,8 +65,8 @@ class TestMemoryTools(unittest.TestCase):
         self.assertEqual(data["test_key"]["value"], "test_value")
         self.assertEqual(data["test_key"]["category"], "test_category")
 
-    async def test_memory_read_persistent(self):
-        """Test reading from persistent memory."""
+    async def _run_memory_read_persistent(self):
+        """Async body for persistent memory read test."""
         # First write some data
         write_tool = MemoryWriteTool()
         await write_tool.execute(
@@ -85,8 +85,8 @@ class TestMemoryTools(unittest.TestCase):
         self.assertIn("read_test", result.output)
         self.assertIn("John", result.output)
 
-    async def test_memory_operations(self):
-        """Test various memory operations."""
+    async def _run_memory_operations(self):
+        """Async body for various memory operations."""
         tool = MemoryWriteTool()
 
         # Test set operation
@@ -124,8 +124,8 @@ class TestMemoryTools(unittest.TestCase):
         self.assertTrue(result.success)
         self.assertIn("2 entries", result.output)
 
-    async def test_memory_types(self):
-        """Test different memory types."""
+    async def _run_memory_types(self):
+        """Async body for different memory types."""
         tool = MemoryWriteTool()
 
         # Test session memory
@@ -150,12 +150,21 @@ class TestMemoryTools(unittest.TestCase):
         self.assertTrue((self.memory_dir / "context.json").exists())
         self.assertTrue(len(list((self.memory_dir / "sessions").glob("*.json"))) > 0)
 
-    def test_sync_memory_tools(self):
-        """Run async memory tool tests."""
-        asyncio.run(self.test_memory_write_persistent())
-        asyncio.run(self.test_memory_read_persistent())
-        asyncio.run(self.test_memory_operations())
-        asyncio.run(self.test_memory_types())
+    def test_memory_write_persistent(self):
+        """Test writing to persistent memory."""
+        asyncio.run(self._run_memory_write_persistent())
+
+    def test_memory_read_persistent(self):
+        """Test reading from persistent memory."""
+        asyncio.run(self._run_memory_read_persistent())
+
+    def test_memory_operations(self):
+        """Test various memory operations."""
+        asyncio.run(self._run_memory_operations())
+
+    def test_memory_types(self):
+        """Test different memory types."""
+        asyncio.run(self._run_memory_types())
 
 
 class TestIntelligentMemorySystem(unittest.TestCase):
@@ -198,8 +207,8 @@ class TestIntelligentMemorySystem(unittest.TestCase):
             os.chdir(self.original_cwd)
             shutil.rmtree(self.test_dir, ignore_errors=True)
 
-    async def test_llm_memory_store(self):
-        """Test LLM-driven memory storage."""
+    async def _run_llm_memory_store(self):
+        """Async body for LLM-driven memory storage."""
         responses = []
         async for chunk in self.engine.process("Remember my favorite color is purple"):
             responses.append(chunk)
@@ -210,8 +219,8 @@ class TestIntelligentMemorySystem(unittest.TestCase):
         self.assertIn("memory_write", full_response)
         self.assertIn("completed successfully", full_response)
 
-    async def test_llm_memory_retrieve(self):
-        """Test LLM-driven memory retrieval."""
+    async def _run_llm_memory_retrieve(self):
+        """Async body for LLM-driven memory retrieval."""
         # First store something
         async for chunk in self.engine.process("Remember my name is Alice"):
             pass  # Just let it execute
@@ -226,8 +235,8 @@ class TestIntelligentMemorySystem(unittest.TestCase):
         # Should use memory_read tool
         self.assertIn("memory_read", full_response)
 
-    async def test_llm_query_analysis(self):
-        """Test LLM query analysis system."""
+    async def _run_llm_query_analysis(self):
+        """Async body for LLM query analysis system."""
         # Test with a memory query
         analysis = await self.engine._llm_should_use_tools(
             "Remember my email is test@example.com"
@@ -245,12 +254,20 @@ class TestIntelligentMemorySystem(unittest.TestCase):
         self.assertTrue(analysis["should_use_tools"])
         self.assertEqual(analysis["context_complexity"], "full")
 
-    def test_sync_llm_memory_system(self):
-        """Run async LLM memory system tests."""
+    def test_llm_memory_store(self):
+        """Test LLM-driven memory storage."""
         if not self.skip_llm_tests:
-            asyncio.run(self.test_llm_memory_store())
-            asyncio.run(self.test_llm_memory_retrieve())
-            asyncio.run(self.test_llm_query_analysis())
+            asyncio.run(self._run_llm_memory_store())
+
+    def test_llm_memory_retrieve(self):
+        """Test LLM-driven memory retrieval."""
+        if not self.skip_llm_tests:
+            asyncio.run(self._run_llm_memory_retrieve())
+
+    def test_llm_query_analysis(self):
+        """Test LLM query analysis system."""
+        if not self.skip_llm_tests:
+            asyncio.run(self._run_llm_query_analysis())
 
 
 class TestMemoryExamples(unittest.TestCase):
@@ -271,8 +288,8 @@ class TestMemoryExamples(unittest.TestCase):
         os.chdir(self.original_cwd)
         shutil.rmtree(self.test_dir, ignore_errors=True)
 
-    async def test_user_preferences_example(self):
-        """Example: Store and retrieve user preferences."""
+    async def _run_user_preferences_example(self):
+        """Async body: store and retrieve user preferences."""
         write_tool = MemoryWriteTool()
         read_tool = MemoryReadTool()
 
@@ -301,8 +318,8 @@ class TestMemoryExamples(unittest.TestCase):
         self.assertIn("dark", result.output)
         self.assertIn("python", result.output)
 
-    async def test_project_history_example(self):
-        """Example: Maintain project history."""
+    async def _run_project_history_example(self):
+        """Async body: maintain project history."""
         write_tool = MemoryWriteTool()
         read_tool = MemoryReadTool()
 
@@ -330,8 +347,8 @@ class TestMemoryExamples(unittest.TestCase):
         self.assertTrue(result.success)
         self.assertIn("3 entries", result.output)
 
-    async def test_api_keys_example(self):
-        """Example: Store API keys (be careful with real keys!)."""
+    async def _run_api_keys_example(self):
+        """Async body: store API keys (be careful with real keys!)."""
         write_tool = MemoryWriteTool()
         read_tool = MemoryReadTool()
 
@@ -358,8 +375,8 @@ class TestMemoryExamples(unittest.TestCase):
         self.assertTrue(result.success)
         self.assertIn("api_keys", result.output)
 
-    async def test_session_notes_example(self):
-        """Example: Session-specific notes."""
+    async def _run_session_notes_example(self):
+        """Async body: session-specific notes."""
         write_tool = MemoryWriteTool()
         read_tool = MemoryReadTool()
 
@@ -385,12 +402,21 @@ class TestMemoryExamples(unittest.TestCase):
         self.assertTrue(result.success)
         self.assertIn("3 entries", result.output)
 
-    def test_sync_memory_examples(self):
-        """Run async memory example tests."""
-        asyncio.run(self.test_user_preferences_example())
-        asyncio.run(self.test_project_history_example())
-        asyncio.run(self.test_api_keys_example())
-        asyncio.run(self.test_session_notes_example())
+    def test_user_preferences_example(self):
+        """Example: Store and retrieve user preferences."""
+        asyncio.run(self._run_user_preferences_example())
+
+    def test_project_history_example(self):
+        """Example: Maintain project history."""
+        asyncio.run(self._run_project_history_example())
+
+    def test_api_keys_example(self):
+        """Example: Store API keys (be careful with real keys!)."""
+        asyncio.run(self._run_api_keys_example())
+
+    def test_session_notes_example(self):
+        """Example: Session-specific notes."""
+        asyncio.run(self._run_session_notes_example())
 
 
 def run_memory_tests():
