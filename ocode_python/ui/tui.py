@@ -190,7 +190,7 @@ class CommandPaletteScreen(ModalScreen):
             Option("Quit", id="quit"),
         )
         options.border_title = "Command Palette"
-        return options
+        yield options
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         choice = event.option.id
