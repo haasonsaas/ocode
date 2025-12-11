@@ -196,7 +196,11 @@ class OCodeEngine:
 
         # Semantic context builder for embedding-based file selection
         if self._arch_config.get("enable_semantic_context", True):
-            self.semantic_context_builder = SemanticContextBuilder(self.context_manager)
+            self.semantic_context_builder = SemanticContextBuilder(
+                self.context_manager,
+                embedding_model=self._arch_config.get("embedding_model"),
+                lazy_embeddings=self._arch_config.get("lazy_embeddings", True),
+            )
         else:
             self.semantic_context_builder = None
 
@@ -1251,274 +1255,31 @@ When a user asks you to perform an action, call the appropriate function."""
         self, query: str, continue_previous: bool = False
     ) -> AsyncGenerator[str, None]:
         """
-        Process a user query through the complete AI workflow pipeline.
+        Main entry point for handling a user query.
 
-        This is the main entry point that orchestrates the entire processing flow:
-        1. Query preprocessing and continuation handling
-        2. Project context analysis and preparation
-        3. AI-driven tool usage decision making
-        4. Message preparation with appropriate context
-        5. Streaming response generation with tool execution
-        6. Automatic continuation for incomplete responses
-
-        The method uses an async generator pattern to stream responses in real-time,
-        providing immediate feedback while processing complex workflows.
-
-        Args:
-            query: User's natural language query or command. Can be anything from
-                   simple questions to complex multi-step requests.
-            continue_previous: Whether to continue from a previous incomplete response.
-                              This allows handling of responses that were cut off due
-                              to token limits or connection issues.
-
-        Yields:
-            str: Response chunks as they are generated. Chunks may contain:
-                 - Natural language responses from the AI
-                 - Tool execution results and outputs
-                 - Progress indicators and status messages
-                 - Error messages and warnings
-
-        Raises:
-            Exception: Various exceptions may be raised for API failures,
-                      tool execution errors, or context preparation issues.
+        Steps:
+        1) Optionally continue a prior partial response
+        2) Build project context
+        3) Decide on tool usage (heuristic first, LLM fallback)
+        4) Stream the response with tool execution and auto-continuation
         """
+
         metrics = ProcessingMetrics(start_time=time.time())
 
         try:
-            # Handle continuation if enabled
-            if continue_previous and self.current_response:
-                query = f"Continue from: {self.current_response[-200:]}\n\n{query}"
-                self.current_response = ""
-                self.response_complete = False
+            prepared_query = self._maybe_continue_previous(query, continue_previous)
+            self.conversation_history.append(Message("user", prepared_query))
 
-            # Add user message to conversation history
-            self.conversation_history.append(Message("user", query))
-
-            # Prepare context
-            context = await self._prepare_context(query)
+            context = await self._prepare_context(prepared_query)
             metrics.files_analyzed = len(context.files)
 
-            # Analyze if tools should be used - try heuristic first
-            heuristic_result = self._heuristic_tool_check(query)
+            llm_analysis = await self._plan_tool_usage(prepared_query)
+            request, tools = self._build_request(prepared_query, context, llm_analysis)
 
-            if heuristic_result is not None:
-                # Heuristic gave definitive answer
-                if self.verbose:
-                    decision = "Use tools" if heuristic_result else "Knowledge response"
-                    print(f"⚡ Heuristic decision: {decision}")
-
-                # Create analysis result matching LLM format
-                llm_analysis = {
-                    "should_use_tools": heuristic_result,
-                    "suggested_tools": [],
-                    "reasoning": "Determined by heuristic pattern matching",
-                    "context_complexity": "simple",
-                    "heuristic_used": True,
-                }
-
-                # Log heuristic usage for tracking
-                import logging
-
-                query_preview = f"{query[:100]}..."
-                logging.info(
-                    f"Heuristic tool decision: {query_preview} -> {heuristic_result}"
-                )
-            else:
-                # Heuristic uncertain, fall back to LLM
-                if self.verbose:
-                    print("🤔 Heuristic uncertain, using LLM analysis...")
-
-                llm_analysis = await self._llm_should_use_tools(query)
-                llm_analysis["heuristic_used"] = False
-
-                # Log LLM fallback usage
-                import logging
-
-                query_preview = f"{query[:100]}..."
-                should_use = llm_analysis.get("should_use_tools")
-                logging.info(f"LLM fallback: {query_preview} -> {should_use}")
-
-            if self.verbose:
-                print(f"🤖 LLM Analysis: {llm_analysis.get('reasoning', '')}")
-                suggested_tools = llm_analysis.get("suggested_tools")
-                if suggested_tools and isinstance(suggested_tools, list):
-                    tools_str = ", ".join(suggested_tools)
-                    print(f"🔧 Suggested tools: {tools_str}")
-
-            # Prepare messages for API
-            messages = self._prepare_messages(query, context, llm_analysis)
-
-            # Add tools to request if tools should be used
-            tools: Optional[List[Dict[str, Any]]] = None
-            if llm_analysis.get("should_use_tools", False):
-                use_simple_context = self._should_use_simple_context(
-                    query, llm_analysis
-                )
-                suggested_tools_list = llm_analysis.get("suggested_tools")
-                if (
-                    use_simple_context
-                    and suggested_tools_list
-                    and isinstance(suggested_tools_list, list)
-                ):
-                    # For simple context, only include suggested tools to
-                    # avoid confusion
-                    tools = []
-                    for tool_name in suggested_tools_list:
-                        if isinstance(tool_name, str):
-                            tool = self.tool_registry.get_tool(tool_name)
-                            if tool:
-                                tools.append(tool.definition.to_ollama_format())
-                else:
-                    # For complex context, include all tools
-                    tools = self.tool_registry.get_tool_definitions()
-            else:
-                if self.verbose:
-                    print("💭 Direct knowledge response - no tools needed")
-
-            # Make API request
-            request = CompletionRequest(
-                model=self.model,
-                messages=messages,
-                stream=True,
-                tools=tools,
-                options={
-                    "temperature": 0.7,
-                    "max_tokens": 32768,  # Increased from 4096
-                    "top_p": 0.95,
-                    "frequency_penalty": 0.0,
-                    "presence_penalty": 0.0,
-                },
-            )
-
-            # Process streaming response with continuation support
-            chunk_buffer = ""
-            chunk_size = self.chunk_size
-            continuation_count = 0
-            max_continuations = self.max_continuations
-            last_response_length = 0  # Track response growth to detect loops
-
-            while continuation_count <= max_continuations:
-                try:
-                    async for chunk in self.api_client.stream_chat(request):
-                        if chunk.tool_call:
-                            # Handle tool call
-                            tool_name = self._map_tool_name(chunk.tool_call.name)
-                            if self.tool_registry.get_tool(tool_name):
-                                try:
-                                    result = await self._execute_tool_call(
-                                        tool_name, chunk.tool_call.arguments, query
-                                    )
-                                    yield f"\n🔧 Tool: {tool_name}\n{result.output}\n"
-                                    metrics.tools_executed += 1
-                                    # After tool execution, mark response as complete
-                                    self.response_complete = True
-                                except Exception as e:
-                                    yield f"\n⚠️ Tool error: {str(e)}\n"
-                                    self.response_complete = True
-                            else:
-                                yield f"\n⚠️ Unknown tool: {tool_name}\n"
-                                self.response_complete = True
-                        elif chunk.content:
-                            # Handle regular content
-                            chunk_buffer += chunk.content
-                            self.current_response += chunk.content
-
-                            # Yield when buffer is full
-                            if len(chunk_buffer) >= chunk_size:
-                                metrics.tokens_processed += len(chunk_buffer.split())
-                                yield chunk_buffer
-                                chunk_buffer = ""
-                        elif chunk.done:
-                            # Handle completion
-                            if chunk_buffer:
-                                yield chunk_buffer
-                                metrics.tokens_processed += len(chunk_buffer.split())
-
-                            # Check if we should continue based on API signals
-                            total_tokens = metrics.tokens_processed
-                            should_continue = self._should_continue_response(
-                                chunk_done=True,  # API says it's done
-                                response_content=self.current_response,
-                                total_tokens=total_tokens,
-                            )
-
-                            if (
-                                should_continue
-                                and continuation_count < max_continuations
-                            ):
-                                # Check for infinite loop (no response growth)
-                                current_length = len(self.current_response)
-                                if (
-                                    current_length <= last_response_length + 50
-                                ):  # Minimal growth threshold
-                                    if self.verbose:
-                                        print(
-                                            "\n⚠️ Stopping continuation: minimal response growth detected"  # noqa: E501
-                                        )
-                                    self.response_complete = True
-                                    break
-
-                                last_response_length = current_length
-                                continuation_count += 1
-
-                                if self.verbose:
-                                    print(
-                                        f"\n🔄 Auto-continuing response (attempt {continuation_count}/{max_continuations})"  # noqa: E501
-                                    )
-                                    response_len = len(self.current_response.strip())
-                                    last_chars = (
-                                        self.current_response.strip()[-50:]
-                                        if response_len > 50
-                                        else self.current_response.strip()
-                                    )
-                                    print(
-                                        f"🔄 Response length: {response_len} chars, ending with: ...{last_chars}"  # noqa: E501
-                                    )
-                                    if response_len < 200:
-                                        print(
-                                            f"🔄 Reason: Response too short ({response_len} chars)"  # noqa: E501
-                                        )
-                                    elif total_tokens >= 4096 * 0.9:
-                                        print(
-                                            f"🔄 Reason: Token limit reached ({total_tokens} tokens)"  # noqa: E501
-                                        )
-                                    else:
-                                        print("🔄 Reason: Response appears truncated")
-
-                                # Prepare continuation request
-                                continuation_query = f"Continue from where you left off. Previous content ended with: {self.current_response[-200:]}"  # noqa: E501
-                                messages = self._prepare_messages(
-                                    continuation_query, context, llm_analysis
-                                )
-                                request = CompletionRequest(
-                                    model=self.model,
-                                    messages=messages,
-                                    stream=True,
-                                    tools=tools,
-                                    options={
-                                        "temperature": 0.7,
-                                        "max_tokens": 32768,
-                                        "top_p": 0.95,
-                                        "frequency_penalty": 0.0,
-                                        "presence_penalty": 0.0,
-                                    },
-                                )
-                                # Break out of the inner chunk loop to restart with new request # noqa: E501
-                                break
-                            else:
-                                # No continuation needed, mark as complete
-                                self.response_complete = True
-                                break
-
-                    # If we get here, either we completed or need to continue
-                    if self.response_complete:
-                        break
-
-                except Exception as e:
-                    if self.verbose:
-                        print(f"⚠️ Stream error: {str(e)}")
-                    yield f"\nStream error: {str(e)}\n"
-                    break
+            async for chunk in self._stream_response(
+                request, tools, context, llm_analysis, prepared_query, metrics
+            ):
+                yield chunk
 
         except Exception as e:
             if self.verbose:
@@ -1531,11 +1292,179 @@ When a user asks you to perform an action, call the appropriate function."""
                     f"\n📊 Metrics: {metrics.duration:.1f}s, {metrics.tokens_processed} tokens, {metrics.files_analyzed} files, {metrics.tools_executed} tools\n"  # noqa: E501
                 )
 
-            # Add assistant response to conversation history
             if self.current_response:
                 self.conversation_history.append(
                     Message("assistant", self.current_response)
                 )
+
+    def _maybe_continue_previous(self, query: str, continue_previous: bool) -> str:
+        """Apply continuation text if requested."""
+        if continue_previous and self.current_response:
+            previous_tail = self.current_response[-200:]
+            self.current_response = ""
+            self.response_complete = False
+            return f"Continue from: {previous_tail}\n\n{query}"
+        return query
+
+    async def _plan_tool_usage(self, query: str) -> Dict[str, Any]:
+        """Decide whether to use tools via heuristic then LLM fallback."""
+        heuristic_result = self._heuristic_tool_check(query)
+        if heuristic_result is not None:
+            if self.verbose:
+                decision = "Use tools" if heuristic_result else "Knowledge response"
+                print(f"⚡ Heuristic decision: {decision}")
+            return {
+                "should_use_tools": heuristic_result,
+                "suggested_tools": [],
+                "reasoning": "Determined by heuristic pattern matching",
+                "context_complexity": "simple",
+                "heuristic_used": True,
+            }
+
+        if self.verbose:
+            print("🤔 Heuristic uncertain, using LLM analysis...")
+
+        llm_analysis = await self._llm_should_use_tools(query)
+        llm_analysis["heuristic_used"] = False
+        return llm_analysis
+
+    def _build_request(
+        self,
+        query: str,
+        context: ProjectContext,
+        llm_analysis: Dict[str, Any],
+    ) -> tuple[CompletionRequest, Optional[List[Dict[str, Any]]]]:
+        """Prepare the completion request and tool list."""
+        messages = self._prepare_messages(query, context, llm_analysis)
+        tools: Optional[List[Dict[str, Any]]] = None
+
+        if llm_analysis.get("should_use_tools", False):
+            use_simple_context = self._should_use_simple_context(query, llm_analysis)
+            suggested_tools_list = llm_analysis.get("suggested_tools")
+            if use_simple_context and suggested_tools_list:
+                tools = []
+                for tool_name in suggested_tools_list:
+                    tool = (
+                        self.tool_registry.get_tool(tool_name)
+                        if isinstance(tool_name, str)
+                        else None
+                    )
+                    if tool:
+                        tools.append(tool.definition.to_ollama_format())
+            else:
+                tools = self.tool_registry.get_tool_definitions()
+        elif self.verbose:
+            print("💭 Direct knowledge response - no tools needed")
+
+        request = CompletionRequest(
+            model=self.model,
+            messages=messages,
+            stream=True,
+            tools=tools,
+            options={
+                "temperature": 0.7,
+                "max_tokens": 32768,
+                "top_p": 0.95,
+                "frequency_penalty": 0.0,
+                "presence_penalty": 0.0,
+            },
+        )
+
+        return request, tools
+
+    async def _stream_response(
+        self,
+        request: CompletionRequest,
+        tools: Optional[List[Dict[str, Any]]],
+        context: ProjectContext,
+        llm_analysis: Dict[str, Any],
+        query: str,
+        metrics: ProcessingMetrics,
+    ) -> AsyncGenerator[str, None]:
+        """Stream chunks from the LLM and handle tool calls and continuation."""
+        chunk_buffer = ""
+        continuation_count = 0
+        last_response_length = 0
+
+        while continuation_count <= self.max_continuations:
+            async for chunk in self.api_client.stream_chat(request):
+                if chunk.tool_call:
+                    tool_output = await self._handle_tool_call(
+                        chunk.tool_call.name, chunk.tool_call.arguments, query
+                    )
+                    metrics.tools_executed += int(tool_output is not None)
+                    if tool_output:
+                        yield tool_output
+                    continue
+
+                if chunk.content:
+                    chunk_buffer += chunk.content
+                    self.current_response += chunk.content
+                    if len(chunk_buffer) >= self.chunk_size:
+                        metrics.tokens_processed += len(chunk_buffer.split())
+                        yield chunk_buffer
+                        chunk_buffer = ""
+                    continue
+
+                if chunk.done:
+                    if chunk_buffer:
+                        metrics.tokens_processed += len(chunk_buffer.split())
+                        yield chunk_buffer
+                        chunk_buffer = ""
+
+                    total_tokens = metrics.tokens_processed
+                    should_continue = self._should_continue_response(
+                        chunk_done=True,
+                        response_content=self.current_response,
+                        total_tokens=total_tokens,
+                    )
+
+                    if should_continue and continuation_count < self.max_continuations:
+                        current_length = len(self.current_response)
+                        if current_length <= last_response_length + 50:
+                            self.response_complete = True
+                            break
+
+                        last_response_length = current_length
+                        continuation_count += 1
+                        continuation_query = (
+                            "Continue from where you left off. Previous content ended with: "
+                            f"{self.current_response[-200:]}"
+                        )
+                        messages = self._prepare_messages(
+                            continuation_query, context, llm_analysis
+                        )
+                        request = CompletionRequest(
+                            model=self.model,
+                            messages=messages,
+                            stream=True,
+                            tools=tools,
+                            options=request.options,
+                        )
+                        break
+
+                    self.response_complete = True
+                    break
+
+            if self.response_complete:
+                break
+
+    async def _handle_tool_call(
+        self, raw_name: str, arguments: Dict[str, Any], query: str
+    ) -> Optional[str]:
+        """Execute a tool call and format its output for streaming."""
+        tool_name = self._map_tool_name(raw_name)
+        tool = self.tool_registry.get_tool(tool_name)
+        if not tool:
+            return f"\n⚠️ Unknown tool: {tool_name}\n"
+
+        try:
+            result = await self._execute_tool_call(tool_name, arguments, query)
+            self.response_complete = True
+            return f"\n🔧 Tool: {tool_name}\n{result.output}\n"
+        except Exception as e:
+            self.response_complete = True
+            return f"\n⚠️ Tool error: {str(e)}\n"
 
     def is_response_complete(self) -> bool:
         """Check if the current response is complete.

@@ -163,15 +163,25 @@ class SemanticContextBuilder:
     """Advanced context builder using semantic analysis."""
 
     def __init__(
-        self, context_manager: ContextManager, cache_dir: Optional[Path] = None
+        self,
+        context_manager: ContextManager,
+        cache_dir: Optional[Path] = None,
+        embedding_model: Optional[str] = None,
+        lazy_embeddings: bool = True,
     ):
         self.context_manager = context_manager
         self.cache_dir = cache_dir or (context_manager.cache_dir / "semantic")
         self.embedding_cache = EmbeddingCache(self.cache_dir)
 
+        # Model loading configuration
+        self.embedding_model_name = embedding_model or "all-MiniLM-L6-v2"
+        self.lazy_embeddings = lazy_embeddings
+        self._embedding_load_task: Optional["asyncio.Task[Any]"] = None
+
         # Initialize embedding model if available
         self.embeddings_model = None
         self.model_version = "fallback"
+        self._embeddings_allowed = EMBEDDINGS_AVAILABLE
 
         if EMBEDDINGS_AVAILABLE:
             try:
@@ -185,22 +195,78 @@ class SemanticContextBuilder:
                 )
 
                 if is_ci:
-                    # In CI environments, skip embeddings to avoid segfaults
+                    self._embeddings_allowed = False
                     logging.info(
                         "CI environment detected, skipping embedding model loading"
                     )
                     self.embeddings_model = None
                     self.model_version = "fallback"
+                elif not lazy_embeddings:
+                    self._load_embeddings_sync()
                 else:
-                    self.embeddings_model = SentenceTransformer("all-MiniLM-L6-v2")
-                    self.model_version = "all-MiniLM-L6-v2"
-                    logging.info(
-                        "Semantic embeddings enabled with sentence-transformers"
-                    )
+                    # Defer loading to avoid blocking first response
+                    self.embeddings_model = None
+                    self.model_version = "fallback"
             except Exception as e:
-                logging.warning(f"Failed to load embedding model: {e}")
+                logging.warning(f"Failed to initialise embedding model loader: {e}")
                 self.embeddings_model = None
                 self.model_version = "fallback"
+        else:
+            self.embeddings_model = None
+            self.model_version = "fallback"
+            self._embeddings_allowed = False
+
+    def _load_embeddings_sync(self) -> None:
+        """Synchronously load the embedding model (used when not in lazy mode)."""
+        self.embeddings_model = SentenceTransformer(self.embedding_model_name)
+        self.model_version = self.embedding_model_name
+        logging.info(
+            "Semantic embeddings enabled with sentence-transformers (%s)",
+            self.embedding_model_name,
+        )
+
+    async def _load_embeddings_async(self) -> None:
+        """Asynchronously load the embedding model without blocking the event loop."""
+        try:
+            import asyncio
+
+            model = await asyncio.to_thread(
+                SentenceTransformer, self.embedding_model_name
+            )
+            self.embeddings_model = model
+            self.model_version = self.embedding_model_name
+            logging.info(
+                "Semantic embeddings loaded asynchronously (%s)",
+                self.embedding_model_name,
+            )
+        except Exception as e:
+            logging.warning(f"Failed to load embedding model asynchronously: {e}")
+            self.embeddings_model = None
+            self.model_version = "fallback"
+        finally:
+            # Clear the task reference so future calls can retry if needed
+            self._embedding_load_task = None
+
+    def _kickoff_embedding_load(self) -> None:
+        """Start background loading of the embedding model if needed."""
+        if (
+            self.embeddings_model is not None
+            or not self._embeddings_allowed
+            or self._embedding_load_task is not None
+        ):
+            return
+
+        try:
+            import asyncio
+
+            loop = asyncio.get_running_loop()
+            self._embedding_load_task = loop.create_task(self._load_embeddings_async())
+        except RuntimeError:
+            # No running loop; fall back to synchronous load as a last resort
+            try:
+                self._load_embeddings_sync()
+            except Exception as e:  # pragma: no cover - defensive
+                logging.warning(f"Fallback embedding load failed: {e}")
 
         # Context expansion rules
         self.expansion_rules = [
@@ -244,6 +310,11 @@ class SemanticContextBuilder:
                 path=file_path, content=content, metadata={"size": len(content)}
             )
             semantic_files.append(semantic_file)
+
+        # Start loading embeddings in the background if not already loaded.
+        # This keeps the first call fast by falling back to keyword scoring
+        # while the model warms up asynchronously.
+        self._kickoff_embedding_load()
 
         # Compute embeddings and similarity scores
         if EMBEDDINGS_AVAILABLE and self.embeddings_model:

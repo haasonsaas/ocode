@@ -61,6 +61,7 @@ DEFAULT_CONFIG = {
         "stream_processor_batch_size": 1048576,  # 1MB
         "semantic_context_max_files": 20,
         "embedding_model": "all-MiniLM-L6-v2",
+        "lazy_embeddings": True,
         "predictive_cache_warm": True,
         "context_expansion_factor": 1.5,
     },
