@@ -1460,7 +1460,8 @@ When a user asks you to perform an action, call the appropriate function."""
                         last_response_length = current_length
                         continuation_count += 1
                         continuation_query = (
-                            "Continue from where you left off. Previous content ended with: "
+                            "Continue from where you left off. "
+                            "Previous content ended with: "
                             f"{self.current_response[-200:]}"
                         )
                         messages = self._prepare_messages(
