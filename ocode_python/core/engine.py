@@ -1292,7 +1292,8 @@ When a user asks you to perform an action, call the appropriate function."""
         Uses a lightweight heuristic (recent tracked files) to keep UI snappy.
         """
         import os
-        from git import Repo, InvalidGitRepositoryError, NoSuchPathError
+
+        from git import InvalidGitRepositoryError, NoSuchPathError, Repo
 
         root = Path(self.config.get("project_root") or os.getcwd())
         files: list[tuple[Path, float]] = []
