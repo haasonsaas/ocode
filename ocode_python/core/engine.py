@@ -1296,7 +1296,7 @@ When a user asks you to perform an action, call the appropriate function."""
         from git import InvalidGitRepositoryError, NoSuchPathError, Repo
 
         root = Path(self.config.get("project_root") or os.getcwd())
-        files: list[tuple[Path, float]] = []
+        files: List[Tuple[Path, float]] = []
 
         try:
             repo = Repo(root, search_parent_directories=True)
