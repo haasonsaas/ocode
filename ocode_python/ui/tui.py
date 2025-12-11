@@ -16,8 +16,9 @@ from textual.containers import Horizontal, Vertical
 from textual.reactive import reactive
 from textual.screen import ModalScreen
 from textual.widgets import Footer, Header, Input, Log, OptionList, Static
+from textual.widgets.option_list import Option
 
-from ..utils.file_operations import read_file_safely  # type: ignore
+from ..utils.file_operations import safe_file_read  # type: ignore
 from .status_line import StatusLine
 
 
@@ -146,19 +147,24 @@ class OCodeTui(App):
 
             cwd = Path.cwd()
             sample = cwd / "README.md"
-            items = [(sample, "")]
+            items = [(sample, 0.0)]
 
         opt_list = self.query_one("#context-list", OptionList)
         opt_list.clear_options()
-        for path, _ in items:
-            opt_list.add_option(OptionList.Option(str(path), id=str(path)))
+        for path, score in items:
+            try:
+                score_val = float(score)
+            except Exception:
+                score_val = 0.0
+            label = f"{Path(path).name} ({score_val:.2f})"
+            opt_list.add_option(Option(label, id=str(path)))
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         """Preview selected context file."""
         path = event.option.id
         preview = "Unavailable"
         try:
-            content = read_file_safely(path, max_bytes=4000)  # type: ignore
+            content = safe_file_read(str(path))  # type: ignore
             preview = content or "(empty file)"
         except Exception:
             preview = "(unable to read file)"
@@ -178,10 +184,10 @@ class CommandPaletteScreen(ModalScreen):
 
     def compose(self) -> ComposeResult:
         options = OptionList(
-            OptionList.Option("Focus prompt", id="focus"),
-            OptionList.Option("Toggle context", id="toggle_context"),
-            OptionList.Option("Clear conversation", id="clear_log"),
-            OptionList.Option("Quit", id="quit"),
+            Option("Focus prompt", id="focus"),
+            Option("Toggle context", id="toggle_context"),
+            Option("Clear conversation", id="clear_log"),
+            Option("Quit", id="quit"),
         )
         options.border_title = "Command Palette"
         return options

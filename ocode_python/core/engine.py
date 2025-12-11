@@ -1286,6 +1286,41 @@ When a user asks you to perform an action, call the appropriate function."""
         # Default to not continuing
         return False
 
+    def get_context_files(self, limit: int = 10) -> list[tuple[Path, float]]:
+        """Return a small set of likely relevant files for UI context.
+
+        Uses a lightweight heuristic (recent tracked files) to keep UI snappy.
+        """
+        import os
+        from git import Repo, InvalidGitRepositoryError, NoSuchPathError
+
+        root = Path(self.config.get("project_root") or os.getcwd())
+        files: list[tuple[Path, float]] = []
+
+        try:
+            repo = Repo(root, search_parent_directories=True)
+            tracked = [Path(p) for p in repo.git.ls_files().splitlines()]
+            tracked_paths = [root / p for p in tracked]
+        except (InvalidGitRepositoryError, NoSuchPathError, Exception):
+            tracked_paths = [p for p in root.rglob("*") if p.is_file()]
+
+        for path in tracked_paths:
+            try:
+                mtime = path.stat().st_mtime
+                files.append((path, mtime))
+            except OSError:
+                continue
+
+        files.sort(key=lambda t: t[1], reverse=True)
+        top = files[:limit]
+        if not top:
+            return []
+
+        times = [t[1] for t in top]
+        tmin, tmax = min(times), max(times)
+        denom = tmax - tmin if tmax != tmin else 1.0
+        return [(p, (t - tmin) / denom) for p, t in top]
+
     async def process(
         self, query: str, continue_previous: bool = False
     ) -> AsyncGenerator[str, None]:
