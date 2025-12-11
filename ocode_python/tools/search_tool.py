@@ -155,7 +155,7 @@ class SearchTool(Tool):
                     results = []
                     for link in soup.find_all("a", class_="result__a")[:max_results]:
                         title = link.get_text(strip=True)
-                        url = link.get("href", "")
+                        url = str(link.get("href", ""))
 
                         # Find snippet in parent container
                         snippet = ""

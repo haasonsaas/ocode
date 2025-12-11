@@ -269,7 +269,8 @@ This quick setup will take just a few minutes.
 
                 async with aiohttp.ClientSession() as session:
                     async with session.get(
-                        "http://localhost:11434/api/tags", timeout=5
+                        "http://localhost:11434/api/tags",
+                        timeout=aiohttp.ClientTimeout(total=5),
                     ) as resp:
                         if resp.status == 200:
                             data = await resp.json()

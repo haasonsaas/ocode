@@ -180,7 +180,7 @@ class SemanticContextBuilder:
         self._embedding_load_task: Optional["asyncio.Task[Any]"] = None
 
         # Initialize embedding model if available
-        self.embeddings_model = None
+        self.embeddings_model: Optional[SentenceTransformer] = None
         self.model_version = "fallback"
         self._embeddings_allowed = EMBEDDINGS_AVAILABLE
 
