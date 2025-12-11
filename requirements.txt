@@ -12,4 +12,4 @@ beautifulsoup4>=4.12.0
 rich>=13.0.0
 click>=8.1.0
 prompt_toolkit>=3.0.0
-textual>=0.58.0
+textual>=0.68.0
