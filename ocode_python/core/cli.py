@@ -129,6 +129,11 @@ async def cli_confirmation_callback(command: str, reason: str) -> bool:
     is_flag=True,
     help="Launch the experimental Textual TUI (requires a real terminal).",
 )
+@click.option(
+    "--classic",
+    is_flag=True,
+    help="Force legacy interactive prompt instead of the Textual TUI.",
+)
 @click.pass_context
 def cli(
     ctx,
@@ -141,6 +146,7 @@ def cli(
     continue_response: bool,
     setup: bool,
     tui: bool,
+    classic: bool,
 ):
     """
     OCode - Terminal-native AI coding assistant powered by Ollama models.
@@ -230,9 +236,30 @@ def cli(
         # Ideal for scripting and automation
         asyncio.run(handle_single_prompt(print_prompt, ctx.obj))
     elif ctx.invoked_subcommand is None:
-        # Interactive mode: start conversation loop
-        # Default behavior when no subcommand is specified
-        asyncio.run(interactive_mode(ctx.obj))
+        # Interactive mode: default to Textual TUI when in a real TTY
+        should_use_tui = (
+            (tui or sys.stdout.isatty())
+            and not classic
+            and os.getenv("OCODE_TUI", "1") != "0"
+        )
+
+        if should_use_tui:
+            try:
+                from ..ui.tui import run_tui
+            except Exception as exc:  # pragma: no cover - defensive import
+                console.print(f"[red]Failed to launch TUI, falling back to classic:[/red] {exc}")
+                asyncio.run(interactive_mode(ctx.obj))
+                return
+
+            engine = OCodeEngine(
+                model=model,
+                output_format=out,
+                verbose=verbose,
+            )
+            run_tui(engine)
+        else:
+            # Legacy interactive prompt
+            asyncio.run(interactive_mode(ctx.obj))
 
 
 @cli.command()

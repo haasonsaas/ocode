@@ -15,7 +15,7 @@ from textual import events
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.reactive import reactive
-from textual.widgets import Footer, Header, Input, Static, TextLog
+from textual.widgets import Footer, Header, Input, Log, Static
 
 
 class OCodeTui(App):
@@ -39,20 +39,23 @@ class OCodeTui(App):
         yield Header(show_clock=True)
         with Horizontal(id="body"):
             with Vertical(id="conversation"):
-                yield TextLog(id="log", highlight=True, markup=True)
+                yield Log(id="log", auto_scroll=True)
                 yield Input(placeholder="Ask OCode…", id="prompt")
             with Vertical(id="context", classes="context-visible"):
                 yield Static("Context will appear here.", id="context-content")
         yield Footer()
 
     def on_mount(self) -> None:
-        self.query_one(TextLog).write("[b]OCode TUI ready[/b]. Press Ctrl+P to focus the prompt.")
+        self.query_one(Log).write(
+            "[b]OCode TUI ready[/b]. Press Ctrl+P to focus the prompt."
+        )
 
     def action_focus_prompt(self) -> None:
         self.query_one(Input).focus()
 
     def action_clear_log(self) -> None:
-        self.query_one(TextLog).clear()
+        log = self.query_one(Log)
+        log.clear()
 
     def action_toggle_context(self) -> None:
         self.show_context = not self.show_context
@@ -63,7 +66,7 @@ class OCodeTui(App):
         prompt = event.value.strip()
         if not prompt:
             return
-        log = self.query_one(TextLog)
+        log = self.query_one(Log)
         log.write(f"[bold cyan]You:[/bold cyan] {prompt}")
         event.input.value = ""
 
@@ -75,8 +78,7 @@ class OCodeTui(App):
         try:
             async for chunk in self.engine.stream_prompt(prompt):
                 if chunk:
-                    log.write(chunk, end="")
-            log.write("")  # newline after stream
+                    log.write(chunk)
         except Exception as exc:  # pragma: no cover - defensive
             log.write(f"[red]Error:[/red] {exc}")
 
@@ -91,4 +93,3 @@ def run_tui(engine: Optional[object] = None) -> None:
     app = OCodeTui(engine=engine)
     # Textual manages its own loop; run() blocks until exit.
     app.run()
-
