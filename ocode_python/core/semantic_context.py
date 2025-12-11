@@ -318,7 +318,7 @@ class SemanticContextBuilder:
         self._kickoff_embedding_load()
 
         # Compute embeddings and similarity scores
-        if EMBEDDINGS_AVAILABLE and self.embeddings_model:
+        if self.embeddings_model:
             await self._compute_semantic_scores(query, semantic_files)
         else:
             await self._compute_keyword_scores(query, semantic_files)
@@ -392,6 +392,9 @@ class SemanticContextBuilder:
         self, query_embedding: Any, batch: List[SemanticFile]
     ) -> None:
         """Process a batch of files for embeddings."""
+        if not self.embeddings_model:
+            # Nothing to do without an embedding model; keep scores at defaults.
+            return
         texts_to_encode = []
         files_to_encode = []
 
@@ -421,7 +424,7 @@ class SemanticContextBuilder:
                 files_to_encode.append((semantic_file, content_hash))
 
         # Compute embeddings for files not in cache
-        if texts_to_encode and self.embeddings_model:
+        if texts_to_encode:
             try:
                 embedding_results: Any = self.embeddings_model.encode(texts_to_encode)
 
@@ -449,7 +452,7 @@ class SemanticContextBuilder:
                         np.linalg.norm(query_embedding) * np.linalg.norm(embedding)
                     )
                     # Clip negative cosine similarity values to prevent negative scores
-                semantic_file.similarity_score = max(0.0, float(similarity))
+                    semantic_file.similarity_score = max(0.0, float(similarity))
 
             except Exception as e:
                 logging.warning(f"Error encoding batch: {e}")

@@ -119,8 +119,6 @@ class OCodeEngine:
         self.output_format = output_format
         self.verbose = verbose
         self.confirmation_callback = confirmation_callback
-        self.max_continuations = max_continuations
-        self.chunk_size = chunk_size
 
         # Initialize core management components
         # These handle cross-cutting concerns like config, auth, and external API access
@@ -155,8 +153,9 @@ class OCodeEngine:
             frequency_penalty=engine_cfg.get("frequency_penalty", 0.0),
             presence_penalty=engine_cfg.get("presence_penalty", 0.0),
         )
-        self.chunk_size = chunk_size or engine_cfg.get("chunk_size", 8192)
-        self.max_continuations = (
+        # Normalize streaming parameters to concrete ints for type safety
+        self.chunk_size: int = int(chunk_size or engine_cfg.get("chunk_size", 8192))
+        self.max_continuations: int = int(
             max_continuations
             if max_continuations is not None
             else engine_cfg.get("max_continuations", 10)
@@ -1416,7 +1415,7 @@ When a user asks you to perform an action, call the appropriate function."""
         continuation_count = 0
         last_response_length = 0
         allow_continuation = llm_analysis.get("should_use_tools", False)
-        max_continuations = self.max_continuations if allow_continuation else 0
+        max_continuations: int = self.max_continuations if allow_continuation else 0
 
         while continuation_count <= max_continuations:
             async for chunk in self.api_client.stream_chat(request):

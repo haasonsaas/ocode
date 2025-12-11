@@ -376,6 +376,13 @@ class ConcurrentToolExecutor:
 
     def __init__(self, max_concurrent: int = DEFAULT_MAX_CONCURRENT):
         self.max_concurrent = max_concurrent
+        # Ensure an event loop exists when instantiated from synchronous contexts
+        # (e.g., during unit tests) to avoid RuntimeError from asyncio.Semaphore.
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            asyncio.set_event_loop(asyncio.new_event_loop())
+
         self.semaphore = asyncio.Semaphore(max_concurrent)
         self.active_tasks: Set[str] = set()
 
