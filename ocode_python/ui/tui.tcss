@@ -14,6 +14,13 @@ Screen {
   height: 1fr;
 }
 
+#toast {
+  dock: top;
+  padding: 0 1;
+  background: $surface-alt;
+  color: $text;
+}
+
 #conversation {
   width: 3fr;
   border: solid $surface-alt;

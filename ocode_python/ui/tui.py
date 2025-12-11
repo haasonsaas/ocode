@@ -8,14 +8,14 @@ incrementally without disturbing the existing Click CLI.
 
 from __future__ import annotations
 
-import asyncio
 from typing import Optional
 
 from textual import events
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.reactive import reactive
-from textual.widgets import Footer, Header, Input, Log, Static
+from textual.screen import ModalScreen
+from textual.widgets import Footer, Header, Input, Log, OptionList, Static
 
 
 class OCodeTui(App):
@@ -23,7 +23,7 @@ class OCodeTui(App):
 
     CSS_PATH = "tui.tcss"
     BINDINGS = [
-        ("ctrl+p", "focus_prompt", "Focus prompt"),
+        ("ctrl+p", "open_palette", "Command palette"),
         ("ctrl+l", "clear_log", "Clear conversation"),
         ("ctrl+b", "toggle_context", "Toggle context"),
         ("ctrl+q", "quit", "Quit"),
@@ -37,6 +37,7 @@ class OCodeTui(App):
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
+        yield ToastBar(id="toast")
         with Horizontal(id="body"):
             with Vertical(id="conversation"):
                 yield Log(id="log", auto_scroll=True)
@@ -46,9 +47,12 @@ class OCodeTui(App):
         yield Footer()
 
     def on_mount(self) -> None:
+        toast = self.query_one(ToastBar)
+        toast.display = False
         self.query_one(Log).write(
-            "[b]OCode TUI ready[/b]. Press Ctrl+P to focus the prompt."
+            "[b]OCode TUI ready[/b]. Press Ctrl+P to open the palette."
         )
+        self.show_toast("TUI ready", style="green")
 
     def action_focus_prompt(self) -> None:
         self.query_one(Input).focus()
@@ -56,11 +60,19 @@ class OCodeTui(App):
     def action_clear_log(self) -> None:
         log = self.query_one(Log)
         log.clear()
+        self.show_toast("Log cleared", style="yellow")
 
     def action_toggle_context(self) -> None:
         self.show_context = not self.show_context
         context_container = self.query_one("#context")
         context_container.display = self.show_context
+        self.show_toast(
+            "Context shown" if self.show_context else "Context hidden",
+            style="cyan",
+        )
+
+    def action_open_palette(self) -> None:
+        self.push_screen(CommandPaletteScreen())
 
     async def on_input_submitted(self, event: Input.Submitted) -> None:
         prompt = event.value.strip()
@@ -86,6 +98,51 @@ class OCodeTui(App):
         # Enter in the prompt already handled by Input.Submitted; skip global handling
         if event.key == "escape":
             self.action_focus_prompt()
+
+    def show_toast(self, message: str, *, style: str = "white", duration: float = 2.5):
+        """Display a transient toast message in the header area."""
+        toast = self.query_one("#toast", ToastBar)
+        toast.show(message, style=style, duration=duration)
+
+
+class CommandPaletteScreen(ModalScreen):
+    """Simple command palette."""
+
+    def compose(self) -> ComposeResult:
+        options = OptionList(
+            OptionList.Option("Focus prompt", id="focus"),
+            OptionList.Option("Toggle context", id="toggle_context"),
+            OptionList.Option("Clear conversation", id="clear_log"),
+            OptionList.Option("Quit", id="quit"),
+        )
+        options.border_title = "Command Palette"
+        return options
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        choice = event.option.id
+        app: OCodeTui = self.app  # type: ignore[assignment]
+        if choice == "focus":
+            app.action_focus_prompt()
+        elif choice == "toggle_context":
+            app.action_toggle_context()
+        elif choice == "clear_log":
+            app.action_clear_log()
+        elif choice == "quit":
+            app.exit()
+        self.app.pop_screen()
+
+
+class ToastBar(Static):
+    """Lightweight toast area that auto-hides."""
+
+    def show(self, message: str, *, style: str = "white", duration: float = 2.5):
+        self.update(f"[{style}]{message}[/{style}]")
+        self.display = True
+        if duration:
+            self.set_timer(duration, lambda: self.hide())
+
+    def hide(self):
+        self.display = False
 
 
 def run_tui(engine: Optional[object] = None) -> None:

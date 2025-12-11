@@ -247,7 +247,9 @@ def cli(
             try:
                 from ..ui.tui import run_tui
             except Exception as exc:  # pragma: no cover - defensive import
-                console.print(f"[red]Failed to launch TUI, falling back to classic:[/red] {exc}")
+                console.print(
+                    f"[red]Failed to launch TUI, falling back to classic:[/red] {exc}"
+                )
                 asyncio.run(interactive_mode(ctx.obj))
                 return
 
