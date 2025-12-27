@@ -1404,7 +1404,7 @@ When a user asks you to perform an action, call the appropriate function."""
         query: str,
         context: ProjectContext,
         llm_analysis: Dict[str, Any],
-    ) -> tuple[CompletionRequest, Optional[List[Dict[str, Any]]]]:
+    ) -> Tuple[CompletionRequest, Optional[List[Dict[str, Any]]]]:
         """Prepare the completion request and tool list."""
         messages = self._prepare_messages(query, context, llm_analysis)
         tools: Optional[List[Dict[str, Any]]] = None
