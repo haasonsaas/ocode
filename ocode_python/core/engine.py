@@ -128,7 +128,9 @@ class OCodeEngine:
         self.auth = (
             AuthenticationManager()
         )  # Manages API keys and authentication tokens
-        self.api_client = OllamaAPIClient()  # Handles communication with Ollama server
+        self.api_client = OllamaAPIClient(
+            host=self.config.get("ollama_host")
+        )  # Handles communication with Ollama server
 
         # Initialize AI workflow components
         # These handle the core AI and automation functionality
