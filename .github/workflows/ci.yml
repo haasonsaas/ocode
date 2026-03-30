@@ -67,7 +67,7 @@ jobs:
         continue-on-error: true
 
       - name: Upload bandit report
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: bandit-report
@@ -78,7 +78,7 @@ jobs:
         continue-on-error: true
 
       - name: Upload safety report
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: safety-report
@@ -139,7 +139,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           files: ./coverage.xml
           flags: unittests
@@ -171,7 +171,7 @@ jobs:
         run: pytest tests/performance/ -v -m performance
 
       - name: Upload performance results
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: performance-results
@@ -204,7 +204,7 @@ jobs:
         run: python -m twine check dist/*
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: dist
           path: dist/
