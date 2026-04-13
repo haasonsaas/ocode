@@ -52,7 +52,7 @@ dev = [
     "isort>=5.12",
     "mypy>=1.0",
     "flake8>=6.0",
-    "types-pyyaml>=6.0",
+    "types-pyyaml>=6.0.12.20250915",
     "types-requests>=2.31",
 ]
 semantic = [
