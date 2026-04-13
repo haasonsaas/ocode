@@ -25,7 +25,7 @@ classifiers = [
     "Topic :: Terminals",
 ]
 dependencies = [
-    "aiohttp>=3.9",
+    "aiohttp>=3.13.5",
     "click>=8.1",
     "rich>=13",
     "textual>=0.68.0",
