@@ -26,7 +26,7 @@ classifiers = [
 ]
 dependencies = [
     "aiohttp>=3.9",
-    "click>=8.1",
+    "click>=8.1.8",
     "rich>=13",
     "textual>=0.68.0",
     "gitpython>=3.1",
